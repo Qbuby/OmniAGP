@@ -7,9 +7,11 @@ edition.workspace = true
 [dependencies]
 omni-core = { path = "../omni-core" }
 omni-llm = { path = "../omni-llm" }
+omni-assets = { path = "../omni-assets" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
+reqwest = { workspace = true }

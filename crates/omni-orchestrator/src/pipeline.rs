@@ -1,4 +1,5 @@
 use anyhow::Result;
+use omni_assets::{AudioClient, AudioType};
 use omni_core::{GameProject, PipelineStep, ProjectStatus, StepStatus, StepType};
 use omni_llm::LlmClient;
 use tracing::info;
@@ -8,6 +9,7 @@ pub struct Pipeline {
     project: GameProject,
     steps: Vec<PipelineStep>,
     llm: LlmClient,
+    audio_client: AudioClient,
 }
 
 impl Pipeline {
@@ -47,10 +49,13 @@ impl Pipeline {
             },
         ];
 
+        let audio_client = AudioClient::from_env();
+
         Self {
             project,
             steps,
             llm,
+            audio_client,
         }
     }
 
@@ -125,7 +130,49 @@ impl Pipeline {
     }
 
     async fn generate_assets(&self) -> Result<serde_json::Value> {
-        Ok(serde_json::json!({"status": "placeholder", "note": "Asset generation to be implemented"}))
+        let design_step = self.steps.iter().find(|s| s.step_type == StepType::GameDesignAnalysis);
+        let assets_needed = design_step
+            .and_then(|s| s.output.as_ref())
+            .and_then(|o| o.get("assets_needed"))
+            .cloned()
+            .unwrap_or(serde_json::json!({}));
+
+        let mut results = vec![];
+
+        if let Some(audio_assets) = assets_needed.get("audio").and_then(|a| a.as_array()) {
+            for asset in audio_assets {
+                let description = asset.get("description").and_then(|d| d.as_str()).unwrap_or("");
+                let audio_type_str = asset.get("type").and_then(|t| t.as_str()).unwrap_or("sfx");
+                let duration = asset.get("duration_sec").and_then(|d| d.as_f64());
+
+                let audio_type = match audio_type_str {
+                    "bgm" => AudioType::Bgm,
+                    _ => AudioType::Sfx,
+                };
+
+                match self.audio_client.generate(description, audio_type, duration, None).await {
+                    Ok(resp) => {
+                        results.push(serde_json::json!({
+                            "type": audio_type_str,
+                            "file_path": resp.file_path,
+                            "valid": resp.validation.valid,
+                        }));
+                    }
+                    Err(e) => {
+                        tracing::warn!(error = %e, "audio asset generation failed, continuing");
+                        results.push(serde_json::json!({
+                            "type": audio_type_str,
+                            "error": e.to_string(),
+                        }));
+                    }
+                }
+            }
+        }
+
+        Ok(serde_json::json!({
+            "status": "completed",
+            "audio_assets": results,
+        }))
     }
 
     async fn assemble_scene(&self) -> Result<serde_json::Value> {
