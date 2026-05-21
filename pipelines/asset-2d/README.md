@@ -5,17 +5,21 @@ ComfyUI-based sidecar service for generating game-ready 2D assets (sprites, icon
 ## Architecture
 
 ```
-API Gateway (Rust)  →  asset-2d sidecar (Python/FastAPI)  →  ComfyUI (SDXL)
-POST /api/v1/generate/2d       POST /generate                    /prompt
+API Gateway (Rust/Axum :8080)
+  └─► asset-2d sidecar (Python/FastAPI :8100)
+        └─► ComfyUI (SDXL :8188)
 ```
 
 ## Features
 
 - SDXL fp16 inference (optimized for 5060Ti 16GB VRAM)
-- Three style presets: pixel, anime, realistic
+- Three style presets: pixel (with LoRA), anime, realistic
 - Automatic background removal (rembg)
 - Tileset auto-slicing
 - IP-Adapter style consistency (via reference image)
+- Base64 or file output modes
+- Model unload endpoint for VRAM management
+- Workflow template loading from JSON files
 - Serial execution with async lock (single GPU)
 
 ## Quick Start
@@ -55,6 +59,7 @@ curl -X POST http://localhost:8080/api/v1/generate/2d \
 | steps | int (1-100) | 25 | Diffusion steps |
 | cfg_scale | float (1-30) | 7.0 | Classifier-free guidance scale |
 | reference_image_b64 | string | null | Base64 reference image for IP-Adapter |
+| output_format | "file" / "base64" | "file" | Output mode |
 
 ### Response
 
@@ -66,6 +71,7 @@ curl -X POST http://localhost:8080/api/v1/generate/2d \
   "assets": [
     {
       "file_path": "/tmp/omni-assets/uuid.png",
+      "data_b64": null,
       "width": 512,
       "height": 512,
       "has_alpha": true,
@@ -76,11 +82,28 @@ curl -X POST http://localhost:8080/api/v1/generate/2d \
 }
 ```
 
+### GET /api/v1/generate/2d/health
+
+Returns ComfyUI connection status and VRAM info.
+
+### POST /api/v1/generate/2d/unload
+
+Frees VRAM by unloading all loaded models from ComfyUI.
+
+## Testing
+
+```bash
+cd pipelines/asset-2d
+pip install -r requirements.txt -r requirements-dev.txt
+pytest test_main.py -v
+```
+
 ## Required Models
 
 Place in ComfyUI models directory:
 - `checkpoints/sd_xl_base_1.0.safetensors` — SDXL base
 - `loras/pixel-art-xl-v1.1.safetensors` — Pixel Art LoRA (for pixel style)
+- IP-Adapter model (for reference image feature)
 
 ## Environment Variables
 
@@ -89,3 +112,4 @@ Place in ComfyUI models directory:
 | COMFYUI_URL | http://127.0.0.1:8188 | ComfyUI server address |
 | ASSET_2D_URL | http://127.0.0.1:8100 | Sidecar address (for api-gateway) |
 | OUTPUT_DIR | /tmp/omni-assets | Generated asset output directory |
+| WORKFLOW_DIR | ./workflows | Directory containing workflow JSON templates |

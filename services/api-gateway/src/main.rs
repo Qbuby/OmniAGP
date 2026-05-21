@@ -109,6 +109,24 @@ async fn generate_2d_health(
         })
 }
 
+async fn unload_models(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    state
+        .asset_2d
+        .unload_models()
+        .await
+        .map(|_| Json(serde_json::json!({"status": "ok"})))
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -133,6 +151,7 @@ async fn main() -> Result<()> {
         .route("/api/v1/games", post(create_game))
         .route("/api/v1/generate/2d", post(generate_2d))
         .route("/api/v1/generate/2d/health", get(generate_2d_health))
+        .route("/api/v1/generate/2d/unload", post(unload_models))
         .with_state(state);
 
     let addr = "0.0.0.0:8080";

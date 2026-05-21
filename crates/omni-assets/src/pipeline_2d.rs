@@ -42,6 +42,8 @@ pub struct Generate2DRequest {
     #[serde(default = "default_cfg")]
     pub cfg_scale: f64,
     pub reference_image_b64: Option<String>,
+    #[serde(default = "default_output_format")]
+    pub output_format: String,
 }
 
 fn default_negative_prompt() -> String {
@@ -71,10 +73,14 @@ fn default_steps() -> u32 {
 fn default_cfg() -> f64 {
     7.0
 }
+fn default_output_format() -> String {
+    "file".into()
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AssetOutput {
-    pub file_path: String,
+    pub file_path: Option<String>,
+    pub data_b64: Option<String>,
     pub width: u32,
     pub height: u32,
     pub has_alpha: bool,
@@ -95,6 +101,7 @@ pub struct Generate2DResponse {
 pub struct SidecarHealth {
     pub status: String,
     pub comfyui_connected: bool,
+    pub vram_free_mb: Option<f64>,
 }
 
 #[derive(Clone)]
@@ -149,5 +156,21 @@ impl Asset2DClient {
         let result: Generate2DResponse =
             resp.json().await.context("invalid generation response")?;
         Ok(result)
+    }
+
+    pub async fn unload_models(&self) -> Result<()> {
+        let resp = self
+            .client
+            .post(format!("{}/unload-models", self.base_url))
+            .send()
+            .await
+            .context("failed to call unload-models")?;
+
+        if !resp.status().is_success() {
+            let status = resp.status();
+            let body = resp.text().await.unwrap_or_default();
+            anyhow::bail!("unload-models returned {status}: {body}");
+        }
+        Ok(())
     }
 }
