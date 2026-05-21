@@ -69,19 +69,19 @@ class MeshProcessor:
         vertices = mesh.vertices
         normals = mesh.vertex_normals
 
-        uv = np.zeros((len(vertices), 2), dtype=np.float64)
         abs_normals = np.abs(normals)
         dominant = np.argmax(abs_normals, axis=1)
 
-        for i, v in enumerate(vertices):
-            if dominant[i] == 0:  # X-dominant
-                uv[i] = [v[1], v[2]]
-            elif dominant[i] == 1:  # Y-dominant
-                uv[i] = [v[0], v[2]]
-            else:  # Z-dominant
-                uv[i] = [v[0], v[1]]
+        uv = np.zeros((len(vertices), 2), dtype=np.float64)
 
-        # Normalize to [0, 1]
+        x_mask = dominant == 0
+        y_mask = dominant == 1
+        z_mask = dominant == 2
+
+        uv[x_mask] = vertices[x_mask][:, [1, 2]]
+        uv[y_mask] = vertices[y_mask][:, [0, 2]]
+        uv[z_mask] = vertices[z_mask][:, [0, 1]]
+
         uv_min = uv.min(axis=0)
         uv_max = uv.max(axis=0)
         uv_range = uv_max - uv_min

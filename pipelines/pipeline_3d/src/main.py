@@ -14,7 +14,7 @@ logging.basicConfig(
 
 def main():
     uvicorn.run(
-        "pipelines.pipeline_3d.src.api.routes:app",
+        "src.api.routes:app",
         host="0.0.0.0",
         port=8090,
         reload=False,

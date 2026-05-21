@@ -35,50 +35,22 @@ class Pipeline3D:
         temp_dir.mkdir(parents=True, exist_ok=True)
 
         try:
-            # Step 1: Generate reference image from text prompt
-            ref_image_path = temp_dir / "reference.png"
-            logger.info(f"[{task_id}] Generating reference image...")
-            await self.ref_image_gen.generate(
-                prompt=request.prompt,
-                output_path=ref_image_path,
-                negative_prompt=request.negative_prompt,
-                seed=request.seed,
+            result = await asyncio.wait_for(
+                self._run_pipeline(request, task_id, output_dir, temp_dir),
+                timeout=settings.generation_timeout,
             )
+            result.generation_time_seconds = round(time.time() - start_time, 2)
+            return result
 
-            # Step 2: Generate 3D mesh from reference image
-            raw_glb_path = temp_dir / "raw_model.glb"
-            backend = request.backend or GenerationBackend(settings.default_backend)
-
-            logger.info(f"[{task_id}] Generating 3D mesh via {backend.value}...")
-            if backend == GenerationBackend.TRIPOSR:
-                await asyncio.to_thread(
-                    self.triposr.generate, ref_image_path, raw_glb_path
-                )
-            else:
-                await self.hunyuan3d.generate(ref_image_path, raw_glb_path)
-
-            # Step 3: Post-process mesh
-            final_glb_path = output_dir / f"{task_id}.glb"
-            raw_glb_path.rename(final_glb_path)
-
-            logger.info(f"[{task_id}] Post-processing mesh...")
-            self.mesh_processor.process(final_glb_path, request.asset_type)
-
-            # Step 4: Quality validation
-            logger.info(f"[{task_id}] Validating mesh quality...")
-            metrics = self.quality_validator.validate(final_glb_path, request.asset_type)
-
+        except asyncio.TimeoutError:
             elapsed = time.time() - start_time
-            logger.info(f"[{task_id}] Pipeline complete in {elapsed:.1f}s")
-
+            logger.error(f"[{task_id}] Pipeline timed out after {elapsed:.1f}s")
             return GenerateResponse(
                 task_id=task_id,
-                status="success",
-                glb_path=str(final_glb_path),
-                metrics=metrics,
+                status="error",
+                error=f"Generation timed out after {settings.generation_timeout}s",
                 generation_time_seconds=round(elapsed, 2),
             )
-
         except Exception as e:
             elapsed = time.time() - start_time
             logger.error(f"[{task_id}] Pipeline failed: {e}")
@@ -89,9 +61,49 @@ class Pipeline3D:
                 generation_time_seconds=round(elapsed, 2),
             )
         finally:
-            # Cleanup temp files
             import shutil
             shutil.rmtree(temp_dir, ignore_errors=True)
+
+    async def _run_pipeline(
+        self, request: GenerateRequest, task_id: str, output_dir: Path, temp_dir: Path
+    ) -> GenerateResponse:
+        ref_image_path = temp_dir / "reference.png"
+        logger.info(f"[{task_id}] Generating reference image...")
+        await self.ref_image_gen.generate(
+            prompt=request.prompt,
+            output_path=ref_image_path,
+            negative_prompt=request.negative_prompt,
+            seed=request.seed,
+        )
+
+        raw_glb_path = temp_dir / "raw_model.glb"
+        backend = request.backend or GenerationBackend(settings.default_backend)
+
+        logger.info(f"[{task_id}] Generating 3D mesh via {backend.value}...")
+        if backend == GenerationBackend.TRIPOSR:
+            await asyncio.to_thread(
+                self.triposr.generate, ref_image_path, raw_glb_path
+            )
+        else:
+            await self.hunyuan3d.generate(ref_image_path, raw_glb_path)
+
+        final_glb_path = output_dir / f"{task_id}.glb"
+        raw_glb_path.rename(final_glb_path)
+
+        logger.info(f"[{task_id}] Post-processing mesh...")
+        self.mesh_processor.process(final_glb_path, request.asset_type)
+
+        logger.info(f"[{task_id}] Validating mesh quality...")
+        metrics = self.quality_validator.validate(final_glb_path, request.asset_type)
+
+        logger.info(f"[{task_id}] Pipeline complete")
+
+        return GenerateResponse(
+            task_id=task_id,
+            status="success",
+            glb_path=str(final_glb_path),
+            metrics=metrics,
+        )
 
     async def close(self):
         await self.ref_image_gen.close()

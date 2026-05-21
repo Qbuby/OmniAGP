@@ -1,6 +1,8 @@
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 
 from ..models import GenerateRequest, GenerateResponse
@@ -36,6 +38,20 @@ async def generate_3d(request: GenerateRequest) -> GenerateResponse:
     if result.status == "error":
         raise HTTPException(status_code=500, detail=result.error)
     return result
+
+
+@app.get("/assets/{task_id}")
+async def download_asset(task_id: str):
+    if not task_id.isalnum():
+        raise HTTPException(status_code=400, detail="Invalid task_id")
+    glb_path = Path(settings.output_dir) / task_id / f"{task_id}.glb"
+    if not glb_path.exists():
+        raise HTTPException(status_code=404, detail="Asset not found")
+    return FileResponse(
+        path=str(glb_path),
+        media_type="model/gltf-binary",
+        filename=f"{task_id}.glb",
+    )
 
 
 @app.get("/health")
