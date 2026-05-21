@@ -81,9 +81,18 @@ class Pipeline3D:
 
         logger.info(f"[{task_id}] Generating 3D mesh via {backend.value}...")
         if backend == GenerationBackend.TRIPOSR:
-            await asyncio.to_thread(
-                self.triposr.generate, ref_image_path, raw_glb_path
-            )
+            try:
+                await asyncio.to_thread(
+                    self.triposr.generate, ref_image_path, raw_glb_path
+                )
+            except Exception as e:
+                if not settings.hunyuan3d_api_url:
+                    raise
+                logger.warning(
+                    f"[{task_id}] TripoSR failed ({e}), falling back to Hunyuan3D-2..."
+                )
+                backend = GenerationBackend.HUNYUAN3D
+                await self.hunyuan3d.generate(ref_image_path, raw_glb_path)
         else:
             await self.hunyuan3d.generate(ref_image_path, raw_glb_path)
 
@@ -102,6 +111,7 @@ class Pipeline3D:
             task_id=task_id,
             status="success",
             glb_path=str(final_glb_path),
+            backend_used=backend.value,
             metrics=metrics,
         )
 

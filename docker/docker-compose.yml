@@ -10,5 +10,37 @@ services:
       - QDRANT__SERVICE__GRPC_PORT=6334
     restart: unless-stopped
 
+  pipeline-3d:
+    build:
+      context: ../pipelines/pipeline_3d
+      dockerfile: Dockerfile
+    ports:
+      - "8090:8090"
+    volumes:
+      - pipeline_3d_output:/app/output
+    environment:
+      - PIPELINE3D_TRIPOSR_DEVICE=cuda
+      - PIPELINE3D_SDXL_API_URL=${PIPELINE3D_SDXL_API_URL:-}
+      - PIPELINE3D_SDXL_API_KEY=${PIPELINE3D_SDXL_API_KEY:-}
+      - PIPELINE3D_HUNYUAN3D_API_URL=${PIPELINE3D_HUNYUAN3D_API_URL:-}
+      - PIPELINE3D_HUNYUAN3D_API_KEY=${PIPELINE3D_HUNYUAN3D_API_KEY:-}
+      - PIPELINE3D_DEFAULT_BACKEND=${PIPELINE3D_DEFAULT_BACKEND:-triposr}
+      - PIPELINE3D_OUTPUT_DIR=/app/output
+      - PIPELINE3D_TEMP_DIR=/app/tmp
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8090/health').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
 volumes:
   qdrant_data:
+  pipeline_3d_output:

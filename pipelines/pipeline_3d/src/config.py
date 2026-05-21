@@ -25,6 +25,10 @@ class Settings(BaseSettings):
     sdxl_width: int = 1024
     sdxl_height: int = 1024
 
+    # Blender CLI post-processing
+    blender_path: str = "blender"
+    use_blender_postprocess: bool = False
+
     # Mesh constraints
     max_vertices_character: int = 50000
     max_vertices_prop: int = 5000

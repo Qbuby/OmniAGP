@@ -1,4 +1,5 @@
 import logging
+import subprocess
 from pathlib import Path
 
 import numpy as np
@@ -9,11 +10,54 @@ from ..models import AssetType
 
 logger = logging.getLogger(__name__)
 
+BLENDER_SCRIPT = Path(__file__).parent / "blender_script.py"
+
 
 class MeshProcessor:
     """Post-process 3D meshes: vertex budget, normals, pivot, UV check."""
 
     def process(self, glb_path: Path, asset_type: AssetType) -> Path:
+        if settings.use_blender_postprocess:
+            return self._process_blender(glb_path, asset_type)
+        return self._process_trimesh(glb_path, asset_type)
+
+    def _process_blender(self, glb_path: Path, asset_type: AssetType) -> Path:
+        max_verts = (
+            settings.max_vertices_character
+            if asset_type == AssetType.CHARACTER
+            else settings.max_vertices_prop
+        )
+
+        logger.info(f"Post-processing mesh via Blender CLI: {glb_path}")
+        output_path = glb_path.with_suffix(".processed.glb")
+
+        cmd = [
+            settings.blender_path,
+            "--background",
+            "--python", str(BLENDER_SCRIPT),
+            "--",
+            str(glb_path),
+            str(output_path),
+            str(max_verts),
+            asset_type.value,
+        ]
+
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=60
+        )
+
+        if result.returncode != 0 or not output_path.exists():
+            logger.warning(
+                f"Blender post-processing failed (rc={result.returncode}), "
+                f"falling back to trimesh. stderr: {result.stderr[:500]}"
+            )
+            return self._process_trimesh(glb_path, asset_type)
+
+        output_path.replace(glb_path)
+        logger.info(f"Blender post-processing complete: {glb_path}")
+        return glb_path
+
+    def _process_trimesh(self, glb_path: Path, asset_type: AssetType) -> Path:
         logger.info(f"Post-processing mesh: {glb_path}")
         mesh = trimesh.load(str(glb_path), force="mesh")
 

@@ -35,6 +35,7 @@ class GenerateResponse(BaseModel):
     task_id: str
     status: str
     glb_path: Optional[str] = None
+    backend_used: Optional[str] = None
     metrics: Optional[MeshMetrics] = None
     error: Optional[str] = None
     generation_time_seconds: Optional[float] = None
