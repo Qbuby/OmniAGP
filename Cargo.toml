@@ -5,6 +5,7 @@ members = [
     "crates/omni-llm",
     "crates/omni-assets",
     "crates/omni-godot",
+    "crates/omni-rag",
     "services/api-gateway",
     "services/worker",
 ]
