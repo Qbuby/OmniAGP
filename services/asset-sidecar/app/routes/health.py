@@ -2,7 +2,9 @@ import shutil
 
 from fastapi import APIRouter
 
+from app.config import settings
 from app.models import HealthResponse
+from app.queue import task_queue
 
 router = APIRouter(tags=["health"])
 
@@ -23,4 +25,6 @@ async def health():
         status="ok",
         version=VERSION,
         gpu_available=_gpu_available(),
+        active_jobs=task_queue.active_count,
+        max_concurrent_jobs=settings.max_concurrent_jobs,
     )

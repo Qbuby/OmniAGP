@@ -9,7 +9,10 @@ from app.routes import generate, health, jobs
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    task_queue._semaphore = __import__("asyncio").Semaphore(settings.max_concurrent_jobs)
+    import asyncio
+
+    task_queue._semaphore = asyncio.Semaphore(settings.max_concurrent_jobs)
+    task_queue.set_orchestrator_url(settings.rust_orchestrator_url)
     yield
 
 

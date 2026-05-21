@@ -54,3 +54,5 @@ class HealthResponse(BaseModel):
     status: str
     version: str
     gpu_available: bool
+    active_jobs: int = 0
+    max_concurrent_jobs: int = 4
