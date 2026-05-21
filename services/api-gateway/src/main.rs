@@ -5,7 +5,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use omni_assets::{AudioClient, AudioType};
+use omni_assets::{AssetDirectorClient, AudioClient, AudioType};
 use omni_core::{AssetQuality, GameEngine, GameProject, LlmProviderConfig, PipelineConfig, ProjectStatus};
 use omni_llm::LlmClient;
 use omni_orchestrator::Pipeline;
@@ -17,6 +17,7 @@ struct AppState {
     llm: LlmClient,
     default_model: String,
     audio_client: AudioClient,
+    director_client: AssetDirectorClient,
 }
 
 #[derive(Deserialize)]
@@ -53,6 +54,20 @@ struct GenerateAudioResponse {
 #[derive(Serialize)]
 struct ErrorResponse {
     error: String,
+}
+
+#[derive(Deserialize)]
+struct ExecuteAssetsRequest {
+    design_doc: serde_json::Value,
+}
+
+#[derive(Serialize)]
+struct ExecuteAssetsResponse {
+    total_tasks: u32,
+    succeeded: u32,
+    failed: u32,
+    failures: Vec<serde_json::Value>,
+    asset_registry: serde_json::Value,
 }
 
 async fn health() -> &'static str {
@@ -142,6 +157,41 @@ async fn generate_audio(
     }))
 }
 
+async fn execute_assets(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ExecuteAssetsRequest>,
+) -> Result<Json<ExecuteAssetsResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let result = state
+        .director_client
+        .execute_design_doc(req.design_doc)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "asset director execution failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?;
+
+    let failures: Vec<serde_json::Value> = result
+        .failures
+        .iter()
+        .map(|f| serde_json::json!({"id": f.id, "error": f.error}))
+        .collect();
+
+    let registry = serde_json::to_value(&result.asset_registry).unwrap_or_default();
+
+    Ok(Json(ExecuteAssetsResponse {
+        total_tasks: result.total_tasks,
+        succeeded: result.succeeded,
+        failed: result.failed,
+        failures,
+        asset_registry: registry,
+    }))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -154,17 +204,20 @@ async fn main() -> Result<()> {
     let llm = LlmClient::from_env("LLM_BASE_URL", "LLM_API_KEY")?;
     let default_model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "qwen2.5-coder-7b".into());
     let audio_client = AudioClient::from_env();
+    let director_client = AssetDirectorClient::from_env();
 
     let state = Arc::new(AppState {
         llm,
         default_model,
         audio_client,
+        director_client,
     });
 
     let app = Router::new()
         .route("/health", get(health))
         .route("/api/v1/games", post(create_game))
         .route("/api/v1/generate/audio", post(generate_audio))
+        .route("/api/v1/assets/execute", post(execute_assets))
         .with_state(state);
 
     let addr = "0.0.0.0:8080";

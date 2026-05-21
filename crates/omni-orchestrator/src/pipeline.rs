@@ -1,5 +1,5 @@
 use anyhow::Result;
-use omni_assets::{AudioClient, AudioType};
+use omni_assets::{AssetDirectorClient, AudioClient, AudioType};
 use omni_core::{GameProject, PipelineStep, ProjectStatus, StepStatus, StepType};
 use omni_llm::LlmClient;
 use tracing::info;
@@ -10,6 +10,7 @@ pub struct Pipeline {
     steps: Vec<PipelineStep>,
     llm: LlmClient,
     audio_client: AudioClient,
+    director_client: AssetDirectorClient,
 }
 
 impl Pipeline {
@@ -50,12 +51,14 @@ impl Pipeline {
         ];
 
         let audio_client = AudioClient::from_env();
+        let director_client = AssetDirectorClient::from_env();
 
         Self {
             project,
             steps,
             llm,
             audio_client,
+            director_client,
         }
     }
 
@@ -131,9 +134,39 @@ impl Pipeline {
 
     async fn generate_assets(&self) -> Result<serde_json::Value> {
         let design_step = self.steps.iter().find(|s| s.step_type == StepType::GameDesignAnalysis);
-        let assets_needed = design_step
+        let design_output = design_step
             .and_then(|s| s.output.as_ref())
-            .and_then(|o| o.get("assets_needed"))
+            .cloned()
+            .unwrap_or(serde_json::json!({}));
+
+        match self.director_client.execute_design_doc(design_output.clone()).await {
+            Ok(resp) => {
+                info!(
+                    total = resp.total_tasks,
+                    succeeded = resp.succeeded,
+                    failed = resp.failed,
+                    "asset director completed"
+                );
+                Ok(serde_json::json!({
+                    "status": "completed",
+                    "method": "asset_director",
+                    "total_tasks": resp.total_tasks,
+                    "succeeded": resp.succeeded,
+                    "failed": resp.failed,
+                    "failures": resp.failures,
+                    "asset_registry": resp.asset_registry,
+                }))
+            }
+            Err(e) => {
+                tracing::warn!(error = %e, "asset director unavailable, falling back to direct audio generation");
+                self.generate_assets_fallback(&design_output).await
+            }
+        }
+    }
+
+    async fn generate_assets_fallback(&self, design_output: &serde_json::Value) -> Result<serde_json::Value> {
+        let assets_needed = design_output
+            .get("assets_needed")
             .cloned()
             .unwrap_or(serde_json::json!({}));
 
@@ -171,6 +204,7 @@ impl Pipeline {
 
         Ok(serde_json::json!({
             "status": "completed",
+            "method": "fallback_direct",
             "audio_assets": results,
         }))
     }

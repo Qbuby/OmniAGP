@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY . ./pipelines/audio/
 
 EXPOSE 8090
 
-CMD ["python", "-m", "pipelines.audio", "--host", "0.0.0.0", "--port", "8090"]
+CMD ["uvicorn", "pipelines.audio.server:app", "--host", "0.0.0.0", "--port", "8090"]
