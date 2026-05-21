@@ -9,6 +9,7 @@ members = [
     "orchestrator",
     "services/api-gateway",
     "services/worker",
+    "tests/smoke",
 ]
 resolver = "2"
 

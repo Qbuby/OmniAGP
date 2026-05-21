@@ -1,0 +1,25 @@
+[package]
+name = "omni-smoke-test"
+description = "M7 end-to-end smoke test — minimal complete game auto-generation"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "smoke-test"
+path = "src/main.rs"
+
+[dependencies]
+omni-core = { path = "../../crates/omni-core" }
+omni-orchestrator = { path = "../../crates/omni-orchestrator" }
+omni-llm = { path = "../../crates/omni-llm" }
+omni-assets = { path = "../../crates/omni-assets" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }
+axum = { workspace = true }
