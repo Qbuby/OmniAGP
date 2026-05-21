@@ -1,6 +1,6 @@
 [package]
 name = "omni-orchestrator"
-description = "Agent orchestration engine — manages multi-step game generation pipelines"
+description = "Agent orchestration engine — Coordinator, DAG scheduler, blackboard, event bus"
 version.workspace = true
 edition.workspace = true
 
@@ -10,6 +10,11 @@ omni-llm = { path = "../omni-llm" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
+thiserror = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 uuid = { workspace = true }
+rusqlite = { workspace = true }
+chrono = { workspace = true }
+async-trait = { workspace = true }
+petgraph = { workspace = true }
