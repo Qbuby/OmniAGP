@@ -7,6 +7,8 @@ edition.workspace = true
 [dependencies]
 omni-core = { path = "../../crates/omni-core" }
 omni-orchestrator = { path = "../../crates/omni-orchestrator" }
+omni-assets = { path = "../../crates/omni-assets" }
+omni-llm = { path = "../../crates/omni-llm" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
