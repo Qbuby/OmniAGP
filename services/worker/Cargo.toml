@@ -1,0 +1,17 @@
+[package]
+name = "omni-worker"
+description = "Background worker — executes pipeline steps asynchronously"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../../crates/omni-core" }
+omni-llm = { path = "../../crates/omni-llm" }
+omni-assets = { path = "../../crates/omni-assets" }
+omni-godot = { path = "../../crates/omni-godot" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

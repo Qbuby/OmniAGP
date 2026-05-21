@@ -1,0 +1,15 @@
+[package]
+name = "omni-llm"
+description = "LLM provider abstraction layer — supports OpenAI-compatible APIs"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+reqwest = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }

@@ -1,0 +1,14 @@
+[package]
+name = "omni-assets"
+description = "Asset generation pipeline — 2D, 3D, audio asset orchestration"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+omni-llm = { path = "../omni-llm" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }

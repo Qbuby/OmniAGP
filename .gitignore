@@ -8,16 +8,20 @@ Cargo.lock
 *.import
 export_presets.cfg
 
-# OS
-.DS_Store
-Thumbs.db
-
 # IDE
-.vscode/
 .idea/
+.vscode/
 *.swp
 *.swo
 
 # Environment
 .env
 .env.local
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated game projects
+/output/

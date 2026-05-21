@@ -1,0 +1,15 @@
+[package]
+name = "omni-godot"
+description = "Godot project generation — GDScript codegen and scene assembly"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+omni-llm = { path = "../omni-llm" }
+omni-rag = { path = "../omni-rag" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }

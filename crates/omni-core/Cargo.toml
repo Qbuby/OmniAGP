@@ -1,0 +1,12 @@
+[package]
+name = "omni-core"
+description = "Core types, traits, and shared utilities for OmniAGP"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
