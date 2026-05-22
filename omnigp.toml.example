@@ -1,0 +1,25 @@
+# OmniAGP Configuration
+# Copy this file to omnigp.toml and customize
+
+[llm]
+base_url = "http://localhost:11434/v1"
+model = "qwen2.5-coder:14b"
+api_key_env = "OMNIGP_API_KEY"
+max_tokens = 8192
+temperature = 0.3
+
+[gpu]
+enabled = true
+device = "cuda:0"
+vram_limit_mb = 16384
+
+[output]
+format = "windows"
+godot_export_template = ""
+include_source = true
+
+[pipeline]
+parallel_assets = true
+max_retries = 3
+qa_iterations = 2
+checkpoint_enabled = true
