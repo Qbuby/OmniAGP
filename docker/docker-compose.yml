@@ -61,6 +61,34 @@ services:
               capabilities: [gpu]
     restart: unless-stopped
 
+  asset-sidecar:
+    build:
+      context: ../services/asset-sidecar
+      dockerfile: Dockerfile
+    ports:
+      - "8100:8100"
+    environment:
+      - SIDECAR_HOST=0.0.0.0
+      - SIDECAR_PORT=8100
+      - SIDECAR_MAX_CONCURRENT_JOBS=4
+      - SIDECAR_RUST_ORCHESTRATOR_URL=http://host.docker.internal:8080
+    volumes:
+      - asset_output:/tmp/asset-sidecar/output
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
   asset-director:
     build:
       context: ../agents/asset_director
@@ -95,3 +123,4 @@ volumes:
   qdrant_data:
   pipeline_3d_output:
   audio_output:
+  asset_output:
