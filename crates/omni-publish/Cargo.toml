@@ -1,0 +1,18 @@
+[package]
+name = "omni-publish"
+description = "Game publishing service — itch.io, Steam, and web CDN deployment"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+omni-auth = { path = "../omni-auth" }
+omni-workflow = { path = "../omni-workflow" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+tokio = { workspace = true }

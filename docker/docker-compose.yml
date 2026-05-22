@@ -128,6 +128,7 @@ services:
       - RUST_LOG=info
     depends_on:
       - nats
+      - qdrant
       - audio-pipeline
       - asset-director
     restart: unless-stopped
@@ -167,6 +168,16 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
+    restart: unless-stopped
+
+  collaboration-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.collaboration-server
+    ports:
+      - "8082:8081"
+    environment:
+      - RUST_LOG=info
     restart: unless-stopped
 
   prometheus:

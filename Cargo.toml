@@ -13,12 +13,18 @@ members = [
     "crates/omni-plugin",
     "crates/omni-templates",
     "crates/omni-marketplace",
+    "crates/omni-collaboration",
+    "crates/omni-workflow",
+    "crates/omni-auth",
+    "crates/omni-notify",
+    "crates/omni-publish",
     "crates/omnigp-cli",
     "orchestrator",
     "services/api-gateway",
     "services/worker",
     "services/scheduler",
     "services/marketplace",
+    "services/collaboration-server",
     "examples/plugin-cyberpunk-style",
     "examples/plugin-retro-exporter",
     "examples/plugin-terrain-generator",
@@ -59,3 +65,5 @@ prometheus = "0.13"
 futures = "0.3"
 semver = { version = "1", features = ["serde"] }
 tower-http = { version = "0.6", features = ["cors", "trace"] }
+tokio-tungstenite = "0.24"
+futures-util = "0.3"

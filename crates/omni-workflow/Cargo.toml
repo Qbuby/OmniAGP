@@ -1,0 +1,16 @@
+[package]
+name = "omni-workflow"
+description = "Review workflow state machine with configurable approval rules"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+omni-auth = { path = "../omni-auth" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
