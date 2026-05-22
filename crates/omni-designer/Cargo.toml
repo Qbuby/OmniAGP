@@ -1,0 +1,20 @@
+[package]
+name = "omni-designer"
+description = "GameDesigner Agent — converts natural language game descriptions into structured Game Design Documents"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+omni-llm = { path = "../omni-llm" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+schemars = { version = "0.8", features = ["uuid1"] }
+
+[dev-dependencies]
+tokio = { workspace = true }
