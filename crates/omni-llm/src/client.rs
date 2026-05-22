@@ -27,6 +27,14 @@ impl LlmClient {
         Ok(Self::new(base_url, api_key))
     }
 
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
+    pub fn api_key(&self) -> &str {
+        &self.api_key
+    }
+
     pub async fn chat(&self, request: &ChatRequest) -> Result<ChatResponse> {
         let url = format!("{}/chat/completions", self.base_url.trim_end_matches('/'));
         info!(model = %request.model, messages = request.messages.len(), "sending chat request");
