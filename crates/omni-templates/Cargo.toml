@@ -1,0 +1,15 @@
+[package]
+name = "omni-templates"
+description = "Game template system — predefined templates, parameterization, and inheritance"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+toml = "0.8"
+tracing = { workspace = true }

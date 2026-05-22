@@ -1,0 +1,10 @@
+[package]
+name = "plugin-cyberpunk-style"
+description = "Example StylePlugin — applies cyberpunk pixel art style to game assets"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-plugin = { path = "../../crates/omni-plugin" }
+anyhow = { workspace = true }
+serde_json = { workspace = true }

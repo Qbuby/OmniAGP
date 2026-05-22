@@ -1,0 +1,54 @@
+id = "visual-novel"
+name = "Visual Novel"
+description = "Branching narrative game with character dialogues, choices, and multiple endings"
+version = "1.0.0"
+author = "OmniAGP"
+category = "VisualNovel"
+engine = "Godot4"
+gdd_template = "gdd_template.json"
+
+[[params]]
+key = "theme"
+label = "Story Genre"
+description = "Genre/setting for the story"
+required = true
+[params.param_type]
+type = "theme"
+
+[[params]]
+key = "character_count"
+label = "Number of Characters"
+description = "Main characters in the story"
+required = true
+[params.param_type]
+type = "integer"
+min = 2
+max = 10
+
+[[params]]
+key = "ending_count"
+label = "Number of Endings"
+description = "Different story endings"
+required = true
+[params.param_type]
+type = "integer"
+min = 2
+max = 8
+
+[[assets]]
+path = "assets/characters"
+asset_type = "sprite"
+description = "Character portraits"
+
+[[assets]]
+path = "assets/backgrounds"
+asset_type = "background"
+description = "Scene backgrounds"
+
+[[scripts]]
+path = "scripts/dialogue_system.gd"
+description = "Dialogue and choice system"
+
+[[scripts]]
+path = "scripts/story_manager.gd"
+description = "Branching narrative logic"

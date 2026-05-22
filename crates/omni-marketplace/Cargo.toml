@@ -1,0 +1,18 @@
+[package]
+name = "omni-marketplace"
+description = "Marketplace backend — asset packs, plugin registry, community contributions"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+omni-plugin = { path = "../omni-plugin" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+semver = { version = "1", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }

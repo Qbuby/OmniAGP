@@ -1,0 +1,23 @@
+{
+  "game_name": "{{theme}} Idle",
+  "genre": "Idle/Clicker",
+  "description": "An incremental idle game themed around {{theme}} with {{upgrade_tiers}} upgrade tiers.",
+  "mechanics": {
+    "core": ["clicking", "auto_generation", "upgrades"],
+    "optional": ["prestige", "achievements", "offline_progress"]
+  },
+  "economy": {
+    "currencies": ["primary", "premium"],
+    "upgrade_tiers": "{{upgrade_tiers}}",
+    "scaling": "exponential",
+    "prestige_enabled": "{{has_prestige}}"
+  },
+  "progression": {
+    "early_game_minutes": 5,
+    "mid_game_hours": 2,
+    "late_game_hours": 24,
+    "prestige_unlock_hours": 4
+  },
+  "art_style": "{{theme}} casual/minimal",
+  "target_platform": "mobile"
+}

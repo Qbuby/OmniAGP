@@ -1,0 +1,25 @@
+{
+  "game_name": "{{theme}} Platformer",
+  "genre": "2D Platformer",
+  "description": "A {{difficulty}} difficulty platformer set in a {{theme}} world with {{level_count}} levels.",
+  "mechanics": {
+    "core": ["running", "jumping", "collecting"],
+    "optional": ["double_jump", "wall_slide", "dash"]
+  },
+  "levels": {
+    "count": "{{level_count}}",
+    "progression": "linear with branching paths",
+    "difficulty_curve": "{{difficulty}}"
+  },
+  "player": {
+    "abilities": ["move", "jump"],
+    "health": 3,
+    "lives": 3
+  },
+  "enemies": {
+    "types": ["walker", "flyer", "shooter"],
+    "boss_per_levels": 5
+  },
+  "art_style": "{{theme}} pixel art",
+  "target_platform": "desktop"
+}

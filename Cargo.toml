@@ -6,8 +6,15 @@ members = [
     "crates/omni-assets",
     "crates/omni-godot",
     "crates/omni-rag",
+    "crates/omni-plugin",
+    "crates/omni-templates",
+    "crates/omni-marketplace",
     "services/api-gateway",
     "services/worker",
+    "services/marketplace",
+    "examples/plugin-cyberpunk-style",
+    "examples/plugin-retro-exporter",
+    "examples/plugin-terrain-generator",
 ]
 resolver = "2"
 
@@ -27,4 +34,8 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 reqwest = { version = "0.12", features = ["json"] }
 axum = "0.8"
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+semver = { version = "1", features = ["serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+toml = "0.8"
+tower-http = { version = "0.6", features = ["cors", "trace"] }

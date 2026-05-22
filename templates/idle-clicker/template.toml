@@ -1,0 +1,56 @@
+id = "idle-clicker"
+name = "Idle/Clicker"
+description = "Incremental idle game with upgrades, prestige mechanics, and offline progress"
+version = "1.0.0"
+author = "OmniAGP"
+category = "Idle"
+engine = "Godot4"
+gdd_template = "gdd_template.json"
+
+[[params]]
+key = "theme"
+label = "Game Theme"
+description = "Theme for the idle game"
+required = true
+[params.param_type]
+type = "theme"
+
+[[params]]
+key = "upgrade_tiers"
+label = "Upgrade Tiers"
+description = "Number of upgrade tiers"
+required = true
+[params.param_type]
+type = "integer"
+min = 3
+max = 20
+
+[[params]]
+key = "has_prestige"
+label = "Prestige System"
+description = "Include prestige/rebirth mechanic"
+required = false
+[params.param_type]
+type = "boolean"
+
+[[assets]]
+path = "assets/ui"
+asset_type = "ui"
+description = "UI elements and icons"
+
+[[assets]]
+path = "assets/effects"
+asset_type = "particle"
+description = "Click and upgrade effects"
+
+[[scripts]]
+path = "scripts/idle_engine.gd"
+description = "Core idle/increment logic"
+
+[[scripts]]
+path = "scripts/upgrade_system.gd"
+description = "Upgrade tree management"
+
+[[scripts]]
+path = "scripts/prestige.gd"
+description = "Prestige/rebirth system"

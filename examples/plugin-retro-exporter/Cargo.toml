@@ -1,0 +1,10 @@
+[package]
+name = "plugin-retro-exporter"
+description = "Example ExporterPlugin — exports games to retro console ROM format"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-plugin = { path = "../../crates/omni-plugin" }
+anyhow = { workspace = true }
+serde_json = { workspace = true }

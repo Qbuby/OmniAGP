@@ -1,0 +1,17 @@
+[package]
+name = "omni-plugin"
+description = "Plugin SDK — traits, lifecycle, sandbox, and configuration schema for OmniAGP plugins"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+semver = { version = "1", features = ["serde"] }
+toml = "0.8"
