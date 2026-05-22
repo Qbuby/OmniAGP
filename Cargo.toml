@@ -9,6 +9,7 @@ members = [
     "crates/omni-designer",
     "crates/omni-qa",
     "crates/omni-fixer",
+    "crates/omnigp-cli",
     "orchestrator",
     "services/api-gateway",
     "services/worker",
@@ -37,3 +38,9 @@ rusqlite = { version = "0.31", features = ["bundled"] }
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
 petgraph = "0.6"
+clap = { version = "4", features = ["derive"] }
+indicatif = "0.17"
+console = "0.15"
+toml = "0.8"
+sha2 = "0.10"
+hex = "0.4"
