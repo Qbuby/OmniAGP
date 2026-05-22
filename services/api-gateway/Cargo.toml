@@ -9,6 +9,7 @@ omni-core = { path = "../../crates/omni-core" }
 omni-orchestrator = { path = "../../crates/omni-orchestrator" }
 omni-assets = { path = "../../crates/omni-assets" }
 omni-llm = { path = "../../crates/omni-llm" }
+omni-scheduler = { path = "../../crates/omni-scheduler" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
@@ -23,10 +24,11 @@ tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "fs", "compression-gzip"] }
 jsonwebtoken = "9"
 oauth2 = "5"
-chrono = { version = "0.4", features = ["serde"] }
+chrono = { workspace = true }
 rust-embed = { version = "8", features = ["compression"] }
 mime_guess = "2"
-dashmap = "6"
-futures = "0.3"
+dashmap = { workspace = true }
+futures = { workspace = true }
 tokio-stream = "0.1"
 reqwest = { workspace = true }
+async-nats = { workspace = true }

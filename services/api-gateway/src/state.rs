@@ -1,13 +1,12 @@
 use dashmap::DashMap;
 use omni_core::GameProject;
-use omni_llm::LlmClient;
+use omni_scheduler::TaskQueue;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use uuid::Uuid;
 
-#[derive(Clone)]
 pub struct AppState {
-    pub llm: LlmClient,
+    pub queue: Arc<TaskQueue>,
     pub default_model: String,
     pub projects: Arc<DashMap<Uuid, GameProject>>,
     pub pipeline_events: Arc<broadcast::Sender<PipelineEvent>>,

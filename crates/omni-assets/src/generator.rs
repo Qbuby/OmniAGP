@@ -90,6 +90,7 @@ pub async fn generate_asset(client: &Asset2DClient, request: AssetRequest) -> As
         steps: 25,
         cfg_scale: 7.0,
         reference_image_b64: request.reference_image_b64.clone(),
+        output_format: "png".into(),
     };
 
     match client.generate(&gen_req).await {

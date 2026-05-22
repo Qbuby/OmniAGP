@@ -73,25 +73,23 @@ impl Pipeline {
             let result = match self.steps[i].step_type {
                 StepType::GameDesignAnalysis => {
                     let input = self.steps[i].input.clone();
-                    self.analyze_game_design(&input).await?
+                    Some(self.analyze_game_design(&input).await?)
                 }
                 StepType::CodeGeneration => {
                     self.project.status = ProjectStatus::Generating;
-                    self.generate_code().await?
+                    Some(self.generate_code().await?)
                 }
                 StepType::AssetGeneration => {
-                    self.generate_assets().await?
+                    Some(self.generate_assets().await?)
                 }
                 StepType::SceneAssembly => {
                     self.project.status = ProjectStatus::Assembling;
-                    self.assemble_scene().await?
+                    Some(self.assemble_scene().await?)
                 }
-                StepType::Testing => {
-                    serde_json::json!({"status": "skipped"})
-                }
+                StepType::Testing => None,
             };
 
-            self.steps[i].output = Some(result);
+            self.steps[i].output = result;
             self.steps[i].status = StepStatus::Complete;
             info!(step = %self.steps[i].name, "step complete");
         }

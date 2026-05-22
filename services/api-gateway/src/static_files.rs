@@ -5,12 +5,12 @@ use axum::{
     routing::get,
     Router,
 };
-use rust_embed::Embed;
+use rust_embed::RustEmbed;
 use std::sync::Arc;
 
 use crate::state::AppState;
 
-#[derive(Embed)]
+#[derive(RustEmbed)]
 #[folder = "../../web/dist"]
 #[allow(dead_code)]
 struct WebAssets;

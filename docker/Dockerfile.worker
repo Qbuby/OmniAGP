@@ -1,0 +1,11 @@
+FROM rust:1.78-slim AS builder
+WORKDIR /app
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ crates/
+COPY services/ services/
+RUN cargo build --release --bin omni-worker
+
+FROM nvidia/cuda:12.4.1-runtime-ubuntu22.04
+RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/omni-worker /usr/local/bin/
+CMD ["omni-worker"]

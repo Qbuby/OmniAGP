@@ -47,13 +47,14 @@ async fn mock_audio_generate(Json(req): Json<AudioGenRequest>) -> Json<AudioGenR
     let duration = req.duration_sec.unwrap_or(5.0);
     let output_dir = req.output_dir.unwrap_or_else(|| ".".into());
     let filename = format!("{}/mock_{}.ogg", output_dir, req.audio_type);
+    let is_bgm = req.audio_type == "bgm";
 
     Json(AudioGenResponse {
         file_path: filename,
         audio_type: req.audio_type,
         duration_sec: duration,
         sample_rate: 44100,
-        loop_point_samples: if req.audio_type == "bgm" { Some(0) } else { None },
+        loop_point_samples: if is_bgm { Some(0) } else { None },
         validation: AudioValidation {
             valid: true,
             issues: vec![],
