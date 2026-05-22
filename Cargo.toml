@@ -7,6 +7,7 @@ members = [
     "crates/omni-godot",
     "crates/omni-rag",
     "crates/omni-designer",
+    "crates/omni-qa",
     "orchestrator",
     "services/api-gateway",
     "services/worker",
