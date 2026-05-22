@@ -1,6 +1,6 @@
 [package]
 name = "omni-api-gateway"
-description = "HTTP API gateway — accepts game generation requests"
+description = "HTTP API gateway — accepts game generation requests and serves web dashboard"
 version.workspace = true
 edition.workspace = true
 
@@ -17,5 +17,16 @@ tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 axum = { workspace = true }
+axum-extra = { version = "0.10", features = ["typed-header"] }
 uuid = { workspace = true }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "fs", "compression-gzip"] }
+jsonwebtoken = "9"
+oauth2 = "5"
+chrono = { version = "0.4", features = ["serde"] }
+rust-embed = { version = "8", features = ["compression"] }
+mime_guess = "2"
+dashmap = "6"
+futures = "0.3"
+tokio-stream = "0.1"
 reqwest = { workspace = true }
