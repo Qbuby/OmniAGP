@@ -7,6 +7,7 @@ edition.workspace = true
 [dependencies]
 omni-core = { path = "../omni-core" }
 omni-llm = { path = "../omni-llm" }
+omni-assets = { path = "../omni-assets" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 anyhow = { workspace = true }
@@ -18,3 +19,4 @@ rusqlite = { workspace = true }
 chrono = { workspace = true }
 async-trait = { workspace = true }
 petgraph = { workspace = true }
+reqwest = { workspace = true }

@@ -2,9 +2,10 @@ use anyhow::Result;
 use axum::{extract::State, http::StatusCode, routing::{get, post}, Json, Router};
 use axum::response::IntoResponse;
 use omni_assets::pipeline_2d::{Asset2DClient, Generate2DRequest, Generate2DResponse};
+use omni_assets::{AssetDirectorClient, AudioClient, AudioType};
 use omni_core::{AssetQuality, GameEngine, GameProject, LlmProviderConfig, PipelineConfig, ProjectStatus};
-use omni_orchestrator::Pipeline;
 use omni_llm::LlmClient;
+use omni_orchestrator::Pipeline;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
@@ -15,6 +16,8 @@ struct AppState {
     asset_2d: Asset2DClient,
     pipeline_3d_url: String,
     http_client: reqwest::Client,
+    audio_client: AudioClient,
+    director_client: AssetDirectorClient,
 }
 
 #[derive(Deserialize)]
@@ -29,9 +32,42 @@ struct CreateGameResponse {
     status: String,
 }
 
+#[derive(Deserialize)]
+struct GenerateAudioRequest {
+    prompt: String,
+    audio_type: String,
+    duration_sec: Option<f64>,
+    output_dir: Option<String>,
+}
+
+#[derive(Serialize)]
+struct GenerateAudioResponse {
+    file_path: String,
+    audio_type: String,
+    duration_sec: f64,
+    sample_rate: u32,
+    loop_point_samples: Option<u64>,
+    valid: bool,
+    issues: Vec<String>,
+}
+
 #[derive(Serialize)]
 struct ErrorResponse {
     error: String,
+}
+
+#[derive(Deserialize)]
+struct ExecuteAssetsRequest {
+    design_doc: serde_json::Value,
+}
+
+#[derive(Serialize)]
+struct ExecuteAssetsResponse {
+    total_tasks: u32,
+    succeeded: u32,
+    failed: u32,
+    failures: Vec<serde_json::Value>,
+    asset_registry: serde_json::Value,
 }
 
 async fn health() -> &'static str {
@@ -162,6 +198,80 @@ async fn generate_3d(
     }
 }
 
+async fn generate_audio(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<GenerateAudioRequest>,
+) -> Result<Json<GenerateAudioResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let audio_type = match req.audio_type.as_str() {
+        "bgm" => AudioType::Bgm,
+        "sfx" => AudioType::Sfx,
+        _ => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                Json(ErrorResponse {
+                    error: "audio_type must be 'bgm' or 'sfx'".into(),
+                }),
+            ));
+        }
+    };
+
+    let result = state
+        .audio_client
+        .generate(
+            &req.prompt,
+            audio_type,
+            req.duration_sec,
+            req.output_dir.as_deref(),
+        )
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "audio generation failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?;
+
+    Ok(Json(GenerateAudioResponse {
+        file_path: result.file_path,
+        audio_type: result.audio_type,
+        duration_sec: result.duration_sec,
+        sample_rate: result.sample_rate,
+        loop_point_samples: result.loop_point_samples,
+        valid: result.validation.valid,
+        issues: result.validation.issues,
+    }))
+}
+
+async fn execute_assets(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<ExecuteAssetsRequest>,
+) -> Result<Json<ExecuteAssetsResponse>, (StatusCode, Json<ErrorResponse>)> {
+    let result = state
+        .director_client
+        .execute(&req.design_doc)
+        .await
+        .map_err(|e| {
+            tracing::error!(error = %e, "asset director execution failed");
+            (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })?;
+
+    Ok(Json(ExecuteAssetsResponse {
+        total_tasks: result.total_tasks,
+        succeeded: result.succeeded,
+        failed: result.failed,
+        failures: result.failures,
+        asset_registry: result.asset_registry,
+    }))
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -176,6 +286,8 @@ async fn main() -> Result<()> {
     let asset_2d = Asset2DClient::from_env();
     let pipeline_3d_url =
         std::env::var("PIPELINE_3D_URL").unwrap_or_else(|_| "http://localhost:8090".into());
+    let audio_client = AudioClient::from_env();
+    let director_client = AssetDirectorClient::from_env();
 
     let state = Arc::new(AppState {
         llm,
@@ -185,6 +297,8 @@ async fn main() -> Result<()> {
         http_client: reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(130))
             .build()?,
+        audio_client,
+        director_client,
     });
 
     let app = Router::new()
@@ -194,6 +308,8 @@ async fn main() -> Result<()> {
         .route("/api/v1/generate/2d/health", get(generate_2d_health))
         .route("/api/v1/generate/2d/unload", post(unload_models))
         .route("/generate/3d", post(generate_3d))
+        .route("/api/v1/generate/audio", post(generate_audio))
+        .route("/api/v1/assets/execute", post(execute_assets))
         .with_state(state);
 
     let addr = "0.0.0.0:8080";
