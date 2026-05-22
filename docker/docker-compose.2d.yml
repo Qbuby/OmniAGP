@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+  comfyui:
+    image: ghcr.io/ai-dock/comfyui:latest
+    ports:
+      - "8188:8188"
+    volumes:
+      - comfyui-models:/opt/ComfyUI/models
+      - comfyui-output:/opt/ComfyUI/output
+      - comfyui-custom-nodes:/opt/ComfyUI/custom_nodes
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    environment:
+      - CLI_ARGS=--lowvram --fp16-vae --preview-method auto
+      - NVIDIA_VISIBLE_DEVICES=all
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8188/system_stats"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 60s
+    restart: unless-stopped
+
+  asset-2d:
+    build:
+      context: ../pipelines/asset-2d
+    ports:
+      - "8100:8100"
+    environment:
+      - COMFYUI_URL=http://comfyui:8188
+      - OUTPUT_DIR=/data/assets
+      - WORKFLOW_DIR=/app/workflows
+    volumes:
+      - asset-output:/data/assets
+    depends_on:
+      comfyui:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8100/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-qwen2.5-coder-7b}
+      - ASSET_2D_URL=http://asset-2d:8100
+      - RUST_LOG=info
+    depends_on:
+      asset-2d:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+
+volumes:
+  comfyui-models:
+  comfyui-output:
+  comfyui-custom-nodes:
+  asset-output:

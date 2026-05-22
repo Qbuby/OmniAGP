@@ -1,5 +1,6 @@
 use anyhow::Result;
-use axum::{extract::State, routing::{get, post}, Json, Router};
+use axum::{extract::State, http::StatusCode, routing::{get, post}, Json, Router};
+use omni_assets::pipeline_2d::{Asset2DClient, Generate2DRequest, Generate2DResponse};
 use omni_core::{AssetQuality, GameEngine, GameProject, LlmProviderConfig, PipelineConfig, ProjectStatus};
 use omni_orchestrator::Pipeline;
 use omni_llm::LlmClient;
@@ -10,6 +11,7 @@ use uuid::Uuid;
 struct AppState {
     llm: LlmClient,
     default_model: String,
+    asset_2d: Asset2DClient,
 }
 
 #[derive(Deserialize)]
@@ -22,6 +24,11 @@ struct CreateGameRequest {
 struct CreateGameResponse {
     project_id: Uuid,
     status: String,
+}
+
+#[derive(Serialize)]
+struct ErrorResponse {
+    error: String,
 }
 
 async fn health() -> &'static str {
@@ -50,7 +57,6 @@ async fn create_game(
 
     let project_id = project.id;
 
-    // In production this would be dispatched to the worker queue
     tokio::spawn(async move {
         let llm = LlmClient::from_env("LLM_BASE_URL", "LLM_API_KEY").unwrap();
         let mut pipeline = Pipeline::new(project, llm);
@@ -65,6 +71,62 @@ async fn create_game(
     })
 }
 
+async fn generate_2d(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<Generate2DRequest>,
+) -> Result<Json<Generate2DResponse>, (StatusCode, Json<ErrorResponse>)> {
+    state
+        .asset_2d
+        .generate(&req)
+        .await
+        .map(Json)
+        .map_err(|e| {
+            tracing::error!(error = %e, "2D asset generation failed");
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })
+}
+
+async fn generate_2d_health(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    state
+        .asset_2d
+        .health()
+        .await
+        .map(|h| Json(serde_json::to_value(h).unwrap()))
+        .map_err(|e| {
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })
+}
+
+async fn unload_models(
+    State(state): State<Arc<AppState>>,
+) -> Result<Json<serde_json::Value>, (StatusCode, Json<ErrorResponse>)> {
+    state
+        .asset_2d
+        .unload_models()
+        .await
+        .map(|_| Json(serde_json::json!({"status": "ok"})))
+        .map_err(|e| {
+            (
+                StatusCode::BAD_GATEWAY,
+                Json(ErrorResponse {
+                    error: e.to_string(),
+                }),
+            )
+        })
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -76,15 +138,20 @@ async fn main() -> Result<()> {
 
     let llm = LlmClient::from_env("LLM_BASE_URL", "LLM_API_KEY")?;
     let default_model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "qwen2.5-coder-7b".into());
+    let asset_2d = Asset2DClient::from_env();
 
     let state = Arc::new(AppState {
         llm,
         default_model,
+        asset_2d,
     });
 
     let app = Router::new()
         .route("/health", get(health))
         .route("/api/v1/games", post(create_game))
+        .route("/api/v1/generate/2d", post(generate_2d))
+        .route("/api/v1/generate/2d/health", get(generate_2d_health))
+        .route("/api/v1/generate/2d/unload", post(unload_models))
         .with_state(state);
 
     let addr = "0.0.0.0:8080";
