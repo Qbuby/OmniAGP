@@ -1,0 +1,19 @@
+[package]
+name = "omni-qa"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "QA Agent and Headless Playtesting framework for OmniAGP"
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
