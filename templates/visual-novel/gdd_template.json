@@ -1,0 +1,22 @@
+{
+  "game_name": "{{theme}} Visual Novel",
+  "genre": "Visual Novel",
+  "description": "A {{theme}} visual novel with {{character_count}} characters and {{ending_count}} endings.",
+  "narrative": {
+    "characters": "{{character_count}}",
+    "endings": "{{ending_count}}",
+    "branching_style": "choice_based",
+    "estimated_playtime_minutes": 60
+  },
+  "mechanics": {
+    "core": ["dialogue", "choices", "branching"],
+    "optional": ["affinity_system", "inventory", "mini_games"]
+  },
+  "presentation": {
+    "character_sprites": "multiple_expressions",
+    "backgrounds": "scene_based",
+    "transitions": ["fade", "slide", "dissolve"]
+  },
+  "art_style": "{{theme}} anime/illustration",
+  "target_platform": "desktop"
+}

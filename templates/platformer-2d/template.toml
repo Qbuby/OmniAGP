@@ -1,0 +1,68 @@
+id = "platformer-2d"
+name = "2D Platformer"
+description = "Classic side-scrolling platformer with jump mechanics, enemies, and collectibles"
+version = "1.0.0"
+author = "OmniAGP"
+category = "Platformer"
+engine = "Godot4"
+gdd_template = "gdd_template.json"
+
+[[params]]
+key = "theme"
+label = "Game Theme"
+description = "Visual theme for the game world"
+required = true
+[params.param_type]
+type = "theme"
+
+[[params]]
+key = "level_count"
+label = "Number of Levels"
+description = "How many levels to generate"
+required = true
+[params.param_type]
+type = "integer"
+min = 1
+max = 50
+[params.default_value]
+value = 5
+
+[[params]]
+key = "difficulty"
+label = "Difficulty"
+description = "Base difficulty level"
+required = true
+[params.param_type]
+type = "select"
+options = ["easy", "medium", "hard"]
+
+[[params]]
+key = "has_double_jump"
+label = "Double Jump"
+description = "Enable double jump mechanic"
+required = false
+[params.param_type]
+type = "boolean"
+
+[[assets]]
+path = "assets/player"
+asset_type = "sprite"
+description = "Player character sprites"
+
+[[assets]]
+path = "assets/tiles"
+asset_type = "tileset"
+description = "Platform tiles"
+
+[[assets]]
+path = "assets/enemies"
+asset_type = "sprite"
+description = "Enemy sprites"
+
+[[scripts]]
+path = "scripts/player_controller.gd"
+description = "Player movement and physics"
+
+[[scripts]]
+path = "scripts/level_generator.gd"
+description = "Procedural level generation"

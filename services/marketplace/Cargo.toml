@@ -1,0 +1,20 @@
+[package]
+name = "omni-marketplace-service"
+description = "Marketplace REST API service — plugin/template/asset pack management"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../../crates/omni-core" }
+omni-plugin = { path = "../../crates/omni-plugin" }
+omni-marketplace = { path = "../../crates/omni-marketplace" }
+omni-templates = { path = "../../crates/omni-templates" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+axum = { workspace = true }
+uuid = { workspace = true }
+tower-http = { version = "0.6", features = ["cors", "trace"] }

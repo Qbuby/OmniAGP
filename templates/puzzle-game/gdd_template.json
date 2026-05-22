@@ -1,0 +1,21 @@
+{
+  "game_name": "{{theme}} Puzzle",
+  "genre": "Puzzle",
+  "description": "A match-style puzzle game with {{level_count}} levels on a {{grid_size}}x{{grid_size}} grid.",
+  "mechanics": {
+    "core": ["match_3", "swap", "cascade"],
+    "optional": ["power_ups", "time_limit", "moves_limit"]
+  },
+  "grid": {
+    "width": "{{grid_size}}",
+    "height": "{{grid_size}}",
+    "piece_types": 6
+  },
+  "levels": {
+    "count": "{{level_count}}",
+    "difficulty_curve": "logarithmic",
+    "objectives": ["score", "clear_pieces", "collect_items"]
+  },
+  "art_style": "{{theme}} casual",
+  "target_platform": "mobile"
+}

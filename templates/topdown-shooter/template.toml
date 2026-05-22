@@ -1,0 +1,59 @@
+id = "topdown-shooter"
+name = "Top-down Shooter"
+description = "Top-down twin-stick shooter with waves of enemies and power-ups"
+version = "1.0.0"
+author = "OmniAGP"
+category = "Shooter"
+engine = "Godot4"
+gdd_template = "gdd_template.json"
+
+[[params]]
+key = "theme"
+label = "Game Theme"
+description = "Visual theme (sci-fi, military, fantasy)"
+required = true
+[params.param_type]
+type = "theme"
+
+[[params]]
+key = "wave_count"
+label = "Number of Waves"
+description = "Total enemy waves"
+required = true
+[params.param_type]
+type = "integer"
+min = 5
+max = 100
+
+[[params]]
+key = "weapon_types"
+label = "Weapon Variety"
+description = "Number of different weapons"
+required = false
+[params.param_type]
+type = "integer"
+min = 1
+max = 10
+
+[[assets]]
+path = "assets/player"
+asset_type = "sprite"
+description = "Player ship/character"
+
+[[assets]]
+path = "assets/weapons"
+asset_type = "sprite"
+description = "Weapon and projectile sprites"
+
+[[assets]]
+path = "assets/enemies"
+asset_type = "sprite"
+description = "Enemy sprites"
+
+[[scripts]]
+path = "scripts/player_controller.gd"
+description = "Twin-stick movement and aiming"
+
+[[scripts]]
+path = "scripts/wave_spawner.gd"
+description = "Enemy wave management"

@@ -1,0 +1,54 @@
+id = "puzzle-game"
+name = "Puzzle Game"
+description = "Grid-based puzzle game with match mechanics and progressive difficulty"
+version = "1.0.0"
+author = "OmniAGP"
+category = "Puzzle"
+engine = "Godot4"
+gdd_template = "gdd_template.json"
+
+[[params]]
+key = "theme"
+label = "Visual Theme"
+description = "Art style for puzzle pieces"
+required = true
+[params.param_type]
+type = "theme"
+
+[[params]]
+key = "grid_size"
+label = "Grid Size"
+description = "Puzzle grid dimensions (NxN)"
+required = true
+[params.param_type]
+type = "integer"
+min = 4
+max = 12
+
+[[params]]
+key = "level_count"
+label = "Number of Levels"
+description = "Total puzzle levels"
+required = true
+[params.param_type]
+type = "integer"
+min = 10
+max = 500
+
+[[assets]]
+path = "assets/pieces"
+asset_type = "sprite"
+description = "Puzzle piece sprites"
+
+[[assets]]
+path = "assets/ui"
+asset_type = "ui"
+description = "UI elements"
+
+[[scripts]]
+path = "scripts/grid_manager.gd"
+description = "Grid logic and matching"
+
+[[scripts]]
+path = "scripts/level_progression.gd"
+description = "Difficulty scaling"

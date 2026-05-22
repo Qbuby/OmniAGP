@@ -1,0 +1,10 @@
+[package]
+name = "plugin-terrain-generator"
+description = "Example GeneratorPlugin — procedural terrain generation for game worlds"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-plugin = { path = "../../crates/omni-plugin" }
+anyhow = { workspace = true }
+serde_json = { workspace = true }

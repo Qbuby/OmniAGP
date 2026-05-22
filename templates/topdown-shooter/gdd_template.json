@@ -1,0 +1,25 @@
+{
+  "game_name": "{{theme}} Shooter",
+  "genre": "Top-down Shooter",
+  "description": "A twin-stick shooter with {{wave_count}} waves set in a {{theme}} universe.",
+  "mechanics": {
+    "core": ["movement", "aiming", "shooting"],
+    "optional": ["dodge_roll", "shield", "special_ability"]
+  },
+  "waves": {
+    "count": "{{wave_count}}",
+    "scaling": "exponential",
+    "boss_interval": 5
+  },
+  "weapons": {
+    "count": "{{weapon_types}}",
+    "types": ["pistol", "shotgun", "rifle", "rocket_launcher"]
+  },
+  "player": {
+    "health": 100,
+    "speed": "medium",
+    "abilities": ["shoot", "dodge", "special"]
+  },
+  "art_style": "{{theme}} top-down",
+  "target_platform": "desktop"
+}

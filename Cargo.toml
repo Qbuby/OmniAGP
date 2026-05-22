@@ -10,11 +10,18 @@ members = [
     "crates/omni-qa",
     "crates/omni-fixer",
     "crates/omni-scheduler",
+    "crates/omni-plugin",
+    "crates/omni-templates",
+    "crates/omni-marketplace",
     "crates/omnigp-cli",
     "orchestrator",
     "services/api-gateway",
     "services/worker",
     "services/scheduler",
+    "services/marketplace",
+    "examples/plugin-cyberpunk-style",
+    "examples/plugin-retro-exporter",
+    "examples/plugin-terrain-generator",
     "tests/smoke",
 ]
 resolver = "2"
@@ -50,3 +57,5 @@ async-nats = "0.38"
 dashmap = "6"
 prometheus = "0.13"
 futures = "0.3"
+semver = { version = "1", features = ["serde"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
