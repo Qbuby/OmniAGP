@@ -9,7 +9,10 @@ use sha2::{Digest, Sha256};
 pub struct Checkpoint {
     pub id: String,
     pub created_at: DateTime<Utc>,
+    pub description: String,
     pub description_hash: String,
+    pub platform: String,
+    pub quality: String,
     pub completed_stages: Vec<String>,
     pub current_stage: Option<String>,
     pub stage_outputs: serde_json::Value,
@@ -17,11 +20,14 @@ pub struct Checkpoint {
 }
 
 impl Checkpoint {
-    pub fn new(description: &str) -> Self {
+    pub fn new(description: &str, platform: &str, quality: &str) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             created_at: Utc::now(),
+            description: description.to_string(),
             description_hash: hash_description(description),
+            platform: platform.to_string(),
+            quality: quality.to_string(),
             completed_stages: Vec::new(),
             current_stage: None,
             stage_outputs: serde_json::json!({}),

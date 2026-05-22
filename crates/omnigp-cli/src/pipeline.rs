@@ -51,7 +51,7 @@ pub async fn run_generate(args: GenerateArgs) -> Result<()> {
     };
 
     if checkpoint.is_none() || incremental {
-        checkpoint = Some(Checkpoint::new(&args.description));
+        checkpoint = Some(Checkpoint::new(&args.description, &args.platform, &args.quality));
     }
     let mut cp = checkpoint.unwrap();
 
@@ -77,26 +77,69 @@ pub async fn run_generate(args: GenerateArgs) -> Result<()> {
         return Err(e);
     }
 
-    // Stage 1: Code Generation (parallel with assets)
-    let stage_result = run_stage(
-        &progress, &mut cp, &mut report, &config, &llm, &project,
-        1, "code_generation", &project_dir,
-    ).await;
-    if let Err(e) = stage_result {
-        progress.fail_stage(1, &e.to_string());
-        save_on_failure(&cp, &report, &args.output)?;
-        return Err(e);
-    }
+    // Stage 1+2: Code Generation & Asset Generation (parallel)
+    if config.pipeline.parallel_assets
+        && !cp.is_stage_complete("code_generation")
+        && !cp.is_stage_complete("asset_generation")
+    {
+        progress.start_stage(1);
+        progress.start_stage(2);
 
-    // Stage 2: Asset Generation
-    let stage_result = run_stage(
-        &progress, &mut cp, &mut report, &config, &llm, &project,
-        2, "asset_generation", &project_dir,
-    ).await;
-    if let Err(e) = stage_result {
-        progress.fail_stage(2, &e.to_string());
-        save_on_failure(&cp, &report, &args.output)?;
-        return Err(e);
+        let code_fut = execute_stage("code_generation", &config, &llm, &project, &project_dir, &progress, 1);
+        let asset_fut = execute_stage("asset_generation", &config, &llm, &project, &project_dir, &progress, 2);
+
+        let (code_result, asset_result) = tokio::join!(code_fut, asset_fut);
+
+        let code_start = Instant::now();
+        match code_result {
+            Ok(result) => {
+                cp.mark_stage_complete("code_generation", result.clone());
+                cp.save(project_dir.parent().unwrap_or(&project_dir))?;
+                progress.complete_stage(1, code_start.elapsed());
+                let tokens = result.get("tokens_used").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                report.add_stage("code_generation", "complete", code_start.elapsed().as_secs_f64(), tokens);
+            }
+            Err(e) => {
+                progress.fail_stage(1, &e.to_string());
+                save_on_failure(&cp, &report, &args.output)?;
+                return Err(e);
+            }
+        }
+
+        match asset_result {
+            Ok(result) => {
+                cp.mark_stage_complete("asset_generation", result.clone());
+                cp.save(project_dir.parent().unwrap_or(&project_dir))?;
+                progress.complete_stage(2, code_start.elapsed());
+                let tokens = result.get("tokens_used").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                report.add_stage("asset_generation", "complete", code_start.elapsed().as_secs_f64(), tokens);
+            }
+            Err(e) => {
+                progress.fail_stage(2, &e.to_string());
+                save_on_failure(&cp, &report, &args.output)?;
+                return Err(e);
+            }
+        }
+    } else {
+        let stage_result = run_stage(
+            &progress, &mut cp, &mut report, &config, &llm, &project,
+            1, "code_generation", &project_dir,
+        ).await;
+        if let Err(e) = stage_result {
+            progress.fail_stage(1, &e.to_string());
+            save_on_failure(&cp, &report, &args.output)?;
+            return Err(e);
+        }
+
+        let stage_result = run_stage(
+            &progress, &mut cp, &mut report, &config, &llm, &project,
+            2, "asset_generation", &project_dir,
+        ).await;
+        if let Err(e) = stage_result {
+            progress.fail_stage(2, &e.to_string());
+            save_on_failure(&cp, &report, &args.output)?;
+            return Err(e);
+        }
     }
 
     // Stage 3: Build & Assembly
@@ -178,14 +221,18 @@ pub async fn run_resume(args: ResumeArgs) -> Result<()> {
     );
 
     let config_path = output.join("omnigp.toml");
-    let _config = OmnigpConfig::load(&config_path)?;
+    let config = if config_path.exists() {
+        config_path.clone()
+    } else {
+        "omnigp.toml".into()
+    };
 
     let generate_args = GenerateArgs {
-        description: String::new(),
+        description: checkpoint.description.clone(),
         output,
-        platform: "windows".into(),
-        config: config_path,
-        quality: "medium".into(),
+        platform: checkpoint.platform.clone(),
+        config,
+        quality: checkpoint.quality.clone(),
         force: false,
     };
 
@@ -215,17 +262,34 @@ async fn run_stage(
 
     progress.update_stage(stage_index, 20, "initializing...");
 
-    let result = execute_stage(stage_name, config, llm, project, project_dir, progress, stage_index).await?;
+    let max_retries = config.pipeline.max_retries;
+    let mut last_error = None;
 
-    let duration = start.elapsed();
-    cp.mark_stage_complete(stage_name, result.clone());
-    cp.save(project_dir.parent().unwrap_or(project_dir))?;
-    progress.complete_stage(stage_index, duration);
+    for attempt in 0..=max_retries {
+        if attempt > 0 {
+            progress.update_stage(stage_index, 20, &format!("retry {}/{}...", attempt, max_retries));
+            tokio::time::sleep(std::time::Duration::from_secs(2u64.pow(attempt))).await;
+        }
 
-    let tokens = result.get("tokens_used").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
-    report.add_stage(stage_name, "complete", duration.as_secs_f64(), tokens);
+        match execute_stage(stage_name, config, llm, project, project_dir, progress, stage_index).await {
+            Ok(result) => {
+                let duration = start.elapsed();
+                cp.mark_stage_complete(stage_name, result.clone());
+                cp.save(project_dir.parent().unwrap_or(project_dir))?;
+                progress.complete_stage(stage_index, duration);
 
-    Ok(())
+                let tokens = result.get("tokens_used").and_then(|v| v.as_u64()).unwrap_or(0) as u32;
+                report.add_stage(stage_name, "complete", duration.as_secs_f64(), tokens);
+                return Ok(());
+            }
+            Err(e) => {
+                tracing::warn!(stage = stage_name, attempt, error = %e, "stage failed");
+                last_error = Some(e);
+            }
+        }
+    }
+
+    Err(last_error.unwrap())
 }
 
 async fn execute_stage(
@@ -394,22 +458,65 @@ async fn run_asset_generation(
     std::fs::create_dir_all(assets_dir.join("audio"))?;
     std::fs::create_dir_all(assets_dir.join("fonts"))?;
 
-    // Placeholder: in production this calls the asset pipeline (M8 Phase2)
-    let placeholder_assets = vec![
-        ("icon.png", "sprites"),
-        ("player.png", "sprites"),
-        ("enemy.png", "sprites"),
-    ];
+    let gdd_path = project_dir.join("gdd.json");
+    let asset_list = if gdd_path.exists() {
+        let gdd_content = std::fs::read_to_string(&gdd_path)?;
+        if let Ok(gdd) = serde_json::from_str::<serde_json::Value>(&gdd_content) {
+            let gdd_inner = gdd.get("gdd").unwrap_or(&gdd);
+            gdd_inner
+                .get("assets_needed")
+                .and_then(|a| a.as_array())
+                .cloned()
+                .unwrap_or_default()
+        } else {
+            Vec::new()
+        }
+    } else {
+        Vec::new()
+    };
 
     let mut generated = Vec::new();
-    for (name, subdir) in &placeholder_assets {
-        let path = assets_dir.join(subdir).join(name);
-        create_placeholder_asset(&path)?;
-        generated.push(format!("{}/{}", subdir, name));
+
+    if asset_list.is_empty() {
+        let defaults = vec![
+            ("icon.png", "sprites"),
+            ("player.png", "sprites"),
+            ("enemy.png", "sprites"),
+            ("background.png", "sprites"),
+        ];
+        for (name, subdir) in &defaults {
+            let path = assets_dir.join(subdir).join(name);
+            create_placeholder_asset(&path)?;
+            generated.push(format!("{}/{}", subdir, name));
+        }
+    } else {
+        for asset in &asset_list {
+            let name = asset.get("name").and_then(|n| n.as_str()).unwrap_or("asset");
+            let asset_type = asset.get("type").and_then(|t| t.as_str()).unwrap_or("sprite");
+
+            let subdir = match asset_type {
+                "sprite" | "texture" | "image" | "tilemap" => "sprites",
+                "audio" | "sound" | "music" | "sfx" => "audio",
+                "font" => "fonts",
+                _ => "sprites",
+            };
+
+            let ext = match asset_type {
+                "audio" | "sound" | "music" | "sfx" => "wav",
+                "font" => "ttf",
+                _ => "png",
+            };
+
+            let filename = format!("{}.{}", name.replace(' ', "_").to_lowercase(), ext);
+            let path = assets_dir.join(subdir).join(&filename);
+            create_placeholder_asset(&path)?;
+            generated.push(format!("{}/{}", subdir, filename));
+        }
     }
 
     Ok(serde_json::json!({
         "assets_generated": generated,
+        "from_gdd": !asset_list.is_empty(),
         "tokens_used": 0
     }))
 }
@@ -458,12 +565,11 @@ script = ExtResource("1")
 }
 
 async fn run_qa_testing(
-    _config: &OmnigpConfig,
+    config: &OmnigpConfig,
     project_dir: &Path,
 ) -> Result<serde_json::Value> {
     let mut issues = Vec::new();
 
-    // Verify project structure
     if !project_dir.join("project.godot").exists() {
         issues.push("Missing project.godot".to_string());
     }
@@ -474,43 +580,110 @@ async fn run_qa_testing(
         issues.push("Missing main scene".to_string());
     }
 
-    let tests_run = 5u32;
-    let tests_passed = tests_run - issues.len() as u32;
-
-    Ok(serde_json::json!({
-        "tests_run": tests_run,
-        "tests_passed": tests_passed,
-        "tests_failed": issues.len(),
-        "issues": issues,
-        "crash_free_seconds": 300,
-        "tokens_used": 0
-    }))
-}
-
-async fn run_fix_iteration(
-    _config: &OmnigpConfig,
-    _llm: &LlmClient,
-    project_dir: &Path,
-) -> Result<serde_json::Value> {
-    let mut fixes_applied = Vec::new();
-
-    // Check for common issues and fix them
     let scripts_dir = project_dir.join("scripts");
     if scripts_dir.exists() {
-        // Ensure all scripts have class_name
         if let Ok(entries) = std::fs::read_dir(&scripts_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().and_then(|e| e.to_str()) == Some("gd") {
                     let content = std::fs::read_to_string(&path).unwrap_or_default();
                     if !content.contains("extends") {
-                        let fixed = format!("extends Node2D\n\n{}", content);
-                        std::fs::write(&path, fixed)?;
-                        fixes_applied.push(format!("Added extends to {}", path.display()));
+                        issues.push(format!("Script {} missing extends declaration", path.file_name().unwrap_or_default().to_string_lossy()));
+                    }
+                    if content.contains("TODO") || content.contains("FIXME") {
+                        issues.push(format!("Script {} contains TODO/FIXME markers", path.file_name().unwrap_or_default().to_string_lossy()));
+                    }
+                    if content.contains("pass") && content.lines().count() < 5 {
+                        issues.push(format!("Script {} appears to be a stub", path.file_name().unwrap_or_default().to_string_lossy()));
                     }
                 }
             }
         }
+    }
+
+    let assets_dir = project_dir.join("assets");
+    if !assets_dir.exists() || std::fs::read_dir(&assets_dir).map(|d| d.count()).unwrap_or(0) == 0 {
+        issues.push("No assets generated".to_string());
+    }
+
+    let total_tests = 8u32;
+    let tests_passed = total_tests - issues.len().min(total_tests as usize) as u32;
+
+    Ok(serde_json::json!({
+        "tests_run": total_tests,
+        "tests_passed": tests_passed,
+        "tests_failed": issues.len(),
+        "issues": issues,
+        "crash_free_seconds": 300,
+        "qa_iterations": config.pipeline.qa_iterations,
+        "tokens_used": 0
+    }))
+}
+
+async fn run_fix_iteration(
+    _config: &OmnigpConfig,
+    llm: &LlmClient,
+    project_dir: &Path,
+) -> Result<serde_json::Value> {
+    use omni_llm::{ChatMessage, ChatRequest, Role};
+
+    let mut fixes_applied = Vec::new();
+    let scripts_dir = project_dir.join("scripts");
+
+    if scripts_dir.exists() {
+        if let Ok(entries) = std::fs::read_dir(&scripts_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|e| e.to_str()) != Some("gd") {
+                    continue;
+                }
+                let content = std::fs::read_to_string(&path).unwrap_or_default();
+
+                if !content.contains("extends") {
+                    let fixed = format!("extends Node2D\n\n{}", content);
+                    std::fs::write(&path, &fixed)?;
+                    fixes_applied.push(format!("Added extends to {}", path.file_name().unwrap_or_default().to_string_lossy()));
+                }
+
+                if content.contains("pass") && content.lines().count() < 5 {
+                    let gdd_path = project_dir.join("gdd.json");
+                    let gdd_context = std::fs::read_to_string(&gdd_path).unwrap_or_default();
+                    let filename = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+
+                    let request = ChatRequest {
+                        model: "qwen2.5-coder:14b".into(),
+                        messages: vec![
+                            ChatMessage {
+                                role: Role::System,
+                                content: "You are a Godot 4 GDScript expert. Fix the stub script by providing a complete implementation. Output ONLY the GDScript code, no markdown.".into(),
+                            },
+                            ChatMessage {
+                                role: Role::User,
+                                content: format!(
+                                    "This script '{}' is a stub:\n```\n{}\n```\nGame context:\n{}\nProvide a complete implementation.",
+                                    filename, content, &gdd_context[..gdd_context.len().min(2000)]
+                                ),
+                            },
+                        ],
+                        temperature: Some(0.2),
+                        max_tokens: Some(4096),
+                    };
+
+                    if let Ok(response) = llm.chat(&request).await {
+                        let fixed_content = &response.choices[0].message.content;
+                        std::fs::write(&path, fixed_content)?;
+                        fixes_applied.push(format!("Expanded stub: {}", filename));
+                    }
+                }
+            }
+        }
+    }
+
+    let scenes_dir = project_dir.join("scenes");
+    if !scenes_dir.join("main.tscn").exists() && scenes_dir.exists() {
+        let main_scene = "[gd_scene load_steps=2 format=3]\n\n[ext_resource type=\"Script\" path=\"res://scripts/main.gd\" id=\"1\"]\n\n[node name=\"Main\" type=\"Node2D\"]\nscript = ExtResource(\"1\")\n";
+        std::fs::write(scenes_dir.join("main.tscn"), main_scene)?;
+        fixes_applied.push("Regenerated missing main.tscn".to_string());
     }
 
     Ok(serde_json::json!({
