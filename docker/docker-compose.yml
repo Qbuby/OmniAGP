@@ -10,5 +10,29 @@ services:
       - QDRANT__SERVICE__GRPC_PORT=6334
     restart: unless-stopped
 
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_MODEL=${LLM_MODEL:-qwen2.5-coder-7b}
+    depends_on:
+      - qdrant
+    restart: unless-stopped
+
+  collaboration-server:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.collaboration-server
+    ports:
+      - "8081:8081"
+    environment:
+      - RUST_LOG=info
+    restart: unless-stopped
+
 volumes:
   qdrant_data:
