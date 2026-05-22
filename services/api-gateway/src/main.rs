@@ -1,69 +1,10 @@
 use anyhow::Result;
-use axum::{extract::State, routing::{get, post}, Json, Router};
-use omni_core::{AssetQuality, GameEngine, GameProject, LlmProviderConfig, PipelineConfig, ProjectStatus};
-use omni_orchestrator::Pipeline;
-use omni_llm::LlmClient;
-use serde::{Deserialize, Serialize};
+use axum::Router;
+use dashmap::DashMap;
+use omni_api_gateway::{auth, projects, static_files, state::AppState, websocket};
 use std::sync::Arc;
-use uuid::Uuid;
-
-struct AppState {
-    llm: LlmClient,
-    default_model: String,
-}
-
-#[derive(Deserialize)]
-struct CreateGameRequest {
-    name: String,
-    description: String,
-}
-
-#[derive(Serialize)]
-struct CreateGameResponse {
-    project_id: Uuid,
-    status: String,
-}
-
-async fn health() -> &'static str {
-    "ok"
-}
-
-async fn create_game(
-    State(state): State<Arc<AppState>>,
-    Json(req): Json<CreateGameRequest>,
-) -> Json<CreateGameResponse> {
-    let project = GameProject {
-        id: Uuid::new_v4(),
-        name: req.name,
-        description: req.description,
-        status: ProjectStatus::Created,
-        pipeline_config: PipelineConfig {
-            target_engine: GameEngine::Godot4,
-            asset_quality: AssetQuality::Medium,
-            llm_provider: LlmProviderConfig {
-                base_url: std::env::var("LLM_BASE_URL").unwrap_or_default(),
-                model: state.default_model.clone(),
-                api_key_env: "LLM_API_KEY".into(),
-            },
-        },
-    };
-
-    let project_id = project.id;
-
-    // In production this would be dispatched to the worker queue
-    tokio::spawn(async move {
-        let llm = LlmClient::from_env("LLM_BASE_URL", "LLM_API_KEY").unwrap();
-        let mut pipeline = Pipeline::new(project, llm);
-        if let Err(e) = pipeline.run().await {
-            tracing::error!(error = %e, "pipeline failed");
-        }
-    });
-
-    Json(CreateGameResponse {
-        project_id,
-        status: "created".into(),
-    })
-}
+use tokio::sync::broadcast;
+use tower_http::cors::{Any, CorsLayer};
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -74,21 +15,40 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let llm = LlmClient::from_env("LLM_BASE_URL", "LLM_API_KEY")?;
+    let llm = omni_llm::LlmClient::from_env("LLM_BASE_URL", "LLM_API_KEY")?;
     let default_model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "qwen2.5-coder-7b".into());
+    let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "omniagp-dev-secret-change-me".into());
+    let github_client_id = std::env::var("GITHUB_CLIENT_ID").unwrap_or_default();
+    let github_client_secret = std::env::var("GITHUB_CLIENT_SECRET").unwrap_or_default();
+
+    let (events_tx, _) = broadcast::channel(256);
 
     let state = Arc::new(AppState {
         llm,
         default_model,
+        projects: Arc::new(DashMap::new()),
+        pipeline_events: Arc::new(events_tx),
+        jwt_secret,
+        github_client_id,
+        github_client_secret,
     });
 
+    let cors = CorsLayer::new()
+        .allow_origin(Any)
+        .allow_methods(Any)
+        .allow_headers(Any);
+
     let app = Router::new()
-        .route("/health", get(health))
-        .route("/api/v1/games", post(create_game))
+        .route("/health", axum::routing::get(|| async { "ok" }))
+        .merge(auth::router())
+        .merge(projects::router())
+        .merge(websocket::router())
+        .merge(static_files::router())
+        .layer(cors)
         .with_state(state);
 
     let addr = "0.0.0.0:8080";
-    tracing::info!("listening on {}", addr);
+    tracing::info!("OmniAGP Dashboard listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())

@@ -4,6 +4,7 @@ use tracing::info;
 
 use crate::types::{ChatRequest, ChatResponse};
 
+#[derive(Clone)]
 pub struct LlmClient {
     http: Client,
     base_url: String,
