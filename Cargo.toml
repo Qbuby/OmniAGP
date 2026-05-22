@@ -6,8 +6,10 @@ members = [
     "crates/omni-assets",
     "crates/omni-godot",
     "crates/omni-rag",
+    "crates/omni-scheduler",
     "services/api-gateway",
     "services/worker",
+    "services/scheduler",
 ]
 resolver = "2"
 
@@ -27,4 +29,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 reqwest = { version = "0.12", features = ["json"] }
 axum = "0.8"
-uuid = { version = "1", features = ["v4"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+async-nats = "0.38"
+chrono = { version = "0.4", features = ["serde"] }
+dashmap = "6"
+prometheus = "0.13"
+futures = "0.3"

@@ -1,14 +1,15 @@
 use anyhow::Result;
 use axum::{extract::State, routing::{get, post}, Json, Router};
-use omni_core::{AssetQuality, GameEngine, GameProject, LlmProviderConfig, PipelineConfig, ProjectStatus};
-use omni_orchestrator::Pipeline;
-use omni_llm::LlmClient;
+use omni_core::{
+    TaskCapability, TaskPayload, TaskPriority,
+};
+use omni_scheduler::TaskQueue;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use uuid::Uuid;
 
 struct AppState {
-    llm: LlmClient,
+    queue: TaskQueue,
     default_model: String,
 }
 
@@ -16,11 +17,29 @@ struct AppState {
 struct CreateGameRequest {
     name: String,
     description: String,
+    #[serde(default)]
+    priority: Option<String>,
 }
 
 #[derive(Serialize)]
 struct CreateGameResponse {
     project_id: Uuid,
+    status: String,
+    tasks: Vec<Uuid>,
+}
+
+#[derive(Deserialize)]
+struct SubmitTaskRequest {
+    project_id: Uuid,
+    capability: TaskCapability,
+    priority: Option<TaskPriority>,
+    min_vram_gb: Option<u32>,
+    payload: serde_json::Value,
+}
+
+#[derive(Serialize)]
+struct SubmitTaskResponse {
+    task_id: Uuid,
     status: String,
 }
 
@@ -32,37 +51,79 @@ async fn create_game(
     State(state): State<Arc<AppState>>,
     Json(req): Json<CreateGameRequest>,
 ) -> Json<CreateGameResponse> {
-    let project = GameProject {
-        id: Uuid::new_v4(),
-        name: req.name,
-        description: req.description,
-        status: ProjectStatus::Created,
-        pipeline_config: PipelineConfig {
-            target_engine: GameEngine::Godot4,
-            asset_quality: AssetQuality::Medium,
-            llm_provider: LlmProviderConfig {
-                base_url: std::env::var("LLM_BASE_URL").unwrap_or_default(),
-                model: state.default_model.clone(),
-                api_key_env: "LLM_API_KEY".into(),
-            },
-        },
+    let project_id = Uuid::new_v4();
+    let priority = match req.priority.as_deref() {
+        Some("urgent") => TaskPriority::Urgent,
+        Some("batch") => TaskPriority::Batch,
+        _ => TaskPriority::Normal,
     };
 
-    let project_id = project.id;
+    let now = chrono::Utc::now().timestamp();
+    let mut task_ids = Vec::new();
 
-    // In production this would be dispatched to the worker queue
-    tokio::spawn(async move {
-        let llm = LlmClient::from_env("LLM_BASE_URL", "LLM_API_KEY").unwrap();
-        let mut pipeline = Pipeline::new(project, llm);
-        if let Err(e) = pipeline.run().await {
-            tracing::error!(error = %e, "pipeline failed");
+    let tasks = vec![
+        (TaskCapability::LlmInference, "game_design_analysis", 8u32),
+        (TaskCapability::LlmInference, "code_generation", 8),
+        (TaskCapability::Image2D, "asset_generation_2d", 10),
+        (TaskCapability::Model3D, "asset_generation_3d", 16),
+        (TaskCapability::Audio, "audio_generation", 6),
+    ];
+
+    for (cap, step_name, min_vram) in tasks {
+        let task = TaskPayload {
+            id: Uuid::new_v4(),
+            project_id,
+            priority,
+            capability: cap,
+            min_vram_gb: min_vram,
+            payload: serde_json::json!({
+                "step": step_name,
+                "project_name": req.name,
+                "description": req.description,
+            }),
+            retry_count: 0,
+            max_retries: 3,
+            created_at: now,
+        };
+        task_ids.push(task.id);
+        if let Err(e) = state.queue.publish(task).await {
+            tracing::error!(error = %e, "failed to publish task");
         }
-    });
+    }
 
     Json(CreateGameResponse {
         project_id,
-        status: "created".into(),
+        status: "queued".into(),
+        tasks: task_ids,
     })
+}
+
+async fn submit_task(
+    State(state): State<Arc<AppState>>,
+    Json(req): Json<SubmitTaskRequest>,
+) -> Json<SubmitTaskResponse> {
+    let task = TaskPayload {
+        id: Uuid::new_v4(),
+        project_id: req.project_id,
+        priority: req.priority.unwrap_or(TaskPriority::Normal),
+        capability: req.capability,
+        min_vram_gb: req.min_vram_gb.unwrap_or(
+            omni_scheduler::strategy::min_vram_for_capability(&req.capability)
+        ),
+        payload: req.payload,
+        retry_count: 0,
+        max_retries: 3,
+        created_at: chrono::Utc::now().timestamp(),
+    };
+
+    let task_id = task.id;
+    match state.queue.publish(task).await {
+        Ok(_) => Json(SubmitTaskResponse { task_id, status: "queued".into() }),
+        Err(e) => {
+            tracing::error!(error = %e, "failed to submit task");
+            Json(SubmitTaskResponse { task_id, status: "error".into() })
+        }
+    }
 }
 
 #[tokio::main]
@@ -74,21 +135,25 @@ async fn main() -> Result<()> {
         )
         .init();
 
-    let llm = LlmClient::from_env("LLM_BASE_URL", "LLM_API_KEY")?;
+    let nats_url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".into());
     let default_model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "qwen2.5-coder-7b".into());
 
+    let queue = TaskQueue::connect(&nats_url).await?;
+    tracing::info!("connected to NATS at {}", nats_url);
+
     let state = Arc::new(AppState {
-        llm,
+        queue,
         default_model,
     });
 
     let app = Router::new()
         .route("/health", get(health))
         .route("/api/v1/games", post(create_game))
+        .route("/api/v1/tasks", post(submit_task))
         .with_state(state);
 
     let addr = "0.0.0.0:8080";
-    tracing::info!("listening on {}", addr);
+    tracing::info!("api-gateway listening on {}", addr);
     let listener = tokio::net::TcpListener::bind(addr).await?;
     axum::serve(listener, app).await?;
     Ok(())

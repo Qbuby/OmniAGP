@@ -1,6 +1,11 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
+pub mod error;
+pub mod scheduler;
+
+pub use scheduler::*;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GameProject {
     pub id: Uuid,
@@ -71,24 +76,4 @@ pub enum StepStatus {
     Running,
     Complete,
     Failed(String),
-}
-
-pub mod error {
-    use thiserror::Error;
-
-    #[derive(Debug, Error)]
-    pub enum OmniError {
-        #[error("LLM request failed: {0}")]
-        LlmError(String),
-        #[error("Asset generation failed: {0}")]
-        AssetError(String),
-        #[error("Code generation failed: {0}")]
-        CodegenError(String),
-        #[error("Pipeline error: {0}")]
-        PipelineError(String),
-        #[error(transparent)]
-        Io(#[from] std::io::Error),
-        #[error(transparent)]
-        Serialization(#[from] serde_json::Error),
-    }
 }

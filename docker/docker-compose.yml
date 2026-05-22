@@ -1,4 +1,14 @@
 services:
+  nats:
+    image: nats:2.10-alpine
+    command: ["--jetstream", "--store_dir", "/data"]
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    restart: unless-stopped
+
   qdrant:
     image: qdrant/qdrant:v1.12.1
     ports:
@@ -10,5 +20,86 @@ services:
       - QDRANT__SERVICE__GRPC_PORT=6334
     restart: unless-stopped
 
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      - NATS_URL=nats://nats:4222
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-qwen2.5-coder-7b}
+      - RUST_LOG=info
+    depends_on:
+      - nats
+    restart: unless-stopped
+
+  scheduler:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.scheduler
+    ports:
+      - "8081:8081"
+    environment:
+      - NATS_URL=nats://nats:4222
+      - RUST_LOG=info
+    depends_on:
+      - nats
+    restart: unless-stopped
+
+  worker:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.worker
+    environment:
+      - NATS_URL=nats://nats:4222
+      - SCHEDULER_URL=http://scheduler:8081
+      - WORKER_LOCATION=local
+      - LLM_BASE_URL=${LLM_BASE_URL:-http://host.docker.internal:11434}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-qwen2.5-coder-7b}
+      - RUST_LOG=info
+    depends_on:
+      - nats
+      - scheduler
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    depends_on:
+      - scheduler
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
 volumes:
+  nats_data:
   qdrant_data:
+  prometheus_data:
+  grafana_data:

@@ -1,6 +1,6 @@
 [package]
 name = "omni-worker"
-description = "Background worker — executes pipeline steps asynchronously"
+description = "Background worker — executes pipeline steps on GPU nodes"
 version.workspace = true
 edition.workspace = true
 
@@ -15,3 +15,8 @@ anyhow = { workspace = true }
 tokio = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+async-nats = { workspace = true }
+chrono = { workspace = true }
+reqwest = { workspace = true }
+futures = { workspace = true }

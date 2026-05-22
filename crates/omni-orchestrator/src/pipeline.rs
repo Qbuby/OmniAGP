@@ -58,34 +58,32 @@ impl Pipeline {
         info!(project = %self.project.name, "starting pipeline");
         self.project.status = ProjectStatus::Analyzing;
 
-        for step in &mut self.steps {
-            info!(step = %step.name, "executing step");
-            step.status = StepStatus::Running;
+        for i in 0..self.steps.len() {
+            info!(step = %self.steps[i].name, "executing step");
+            self.steps[i].status = StepStatus::Running;
 
-            match step.step_type {
+            let result = match self.steps[i].step_type {
                 StepType::GameDesignAnalysis => {
-                    let result = self.analyze_game_design(&step.input).await?;
-                    step.output = Some(result);
+                    let input = self.steps[i].input.clone();
+                    Some(self.analyze_game_design(&input).await?)
                 }
                 StepType::CodeGeneration => {
                     self.project.status = ProjectStatus::Generating;
-                    let result = self.generate_code().await?;
-                    step.output = Some(result);
+                    Some(self.generate_code().await?)
                 }
                 StepType::AssetGeneration => {
-                    let result = self.generate_assets().await?;
-                    step.output = Some(result);
+                    Some(self.generate_assets().await?)
                 }
                 StepType::SceneAssembly => {
                     self.project.status = ProjectStatus::Assembling;
-                    let result = self.assemble_scene().await?;
-                    step.output = Some(result);
+                    Some(self.assemble_scene().await?)
                 }
-                StepType::Testing => {}
-            }
+                StepType::Testing => None,
+            };
 
-            step.status = StepStatus::Complete;
-            info!(step = %step.name, "step complete");
+            self.steps[i].output = result;
+            self.steps[i].status = StepStatus::Complete;
+            info!(step = %self.steps[i].name, "step complete");
         }
 
         self.project.status = ProjectStatus::Complete;
