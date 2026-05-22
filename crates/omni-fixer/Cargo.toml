@@ -1,0 +1,18 @@
+[package]
+name = "omni-fixer"
+description = "Fixer Agent — auto-diagnose and repair bugs in generated game code"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+omni-core = { path = "../omni-core" }
+omni-llm = { path = "../omni-llm" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+async-trait = { workspace = true }
