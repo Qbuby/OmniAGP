@@ -2,6 +2,7 @@ use crate::users::UserStore;
 use dashmap::DashMap;
 use omni_core::GameProject;
 use omni_scheduler::TaskQueue;
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use uuid::Uuid;
@@ -10,6 +11,8 @@ pub struct AppState {
     pub queue: Arc<TaskQueue>,
     pub default_model: String,
     pub projects: Arc<DashMap<Uuid, GameProject>>,
+    pub artifact_dirs: Arc<DashMap<Uuid, PathBuf>>,
+    pub artifact_root: PathBuf,
     pub pipeline_events: Arc<broadcast::Sender<PipelineEvent>>,
     pub jwt_secret: String,
     pub github_client_id: String,

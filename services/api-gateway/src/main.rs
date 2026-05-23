@@ -160,10 +160,19 @@ async fn main() -> Result<()> {
     let queue = Arc::new(TaskQueue::connect(&nats_url).await?);
     tracing::info!("connected to NATS at {}", nats_url);
 
+    let artifact_root: PathBuf = std::env::var("ARTIFACT_ROOT")
+        .unwrap_or_else(|_| "./data/projects".into())
+        .into();
+    if let Err(e) = std::fs::create_dir_all(&artifact_root) {
+        tracing::warn!(error = %e, path = %artifact_root.display(), "failed to create artifact root, continuing");
+    }
+
     let state = Arc::new(AppState {
         queue,
         default_model,
         projects: Arc::new(DashMap::new()),
+        artifact_dirs: Arc::new(DashMap::new()),
+        artifact_root,
         pipeline_events: Arc::new(events_tx),
         jwt_secret,
         github_client_id,
