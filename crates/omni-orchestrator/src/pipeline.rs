@@ -166,7 +166,7 @@ impl Pipeline {
         let assets_needed = design_output
             .get("assets_needed")
             .cloned()
-            .unwrap_or(serde_json::json!());
+            .unwrap_or(serde_json::json!({}));
 
         let mut results = vec![];
 
