@@ -17,8 +17,11 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401) {
-      useAuthStore.getState().logout();
-      window.location.href = '/login';
+      const url = err.config?.url || '';
+      if (!url.startsWith('/auth/')) {
+        useAuthStore.getState().logout();
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(err);
   },
@@ -55,7 +58,22 @@ export const projectsApi = {
     api.post<{ status: string; project_id: string }>(`/projects/${id}/run`).then((r) => r.data),
 };
 
+export interface AuthProviders {
+  local: boolean;
+  github: boolean;
+}
+
+export interface AuthResponse {
+  token: string;
+  user: { id: string; username: string };
+}
+
 export const authApi = {
+  providers: () => api.get<AuthProviders>('/auth/providers').then((r) => r.data),
+  login: (data: { username: string; password: string }) =>
+    api.post<AuthResponse>('/auth/login', data).then((r) => r.data),
+  register: (data: { username: string; password: string }) =>
+    api.post<AuthResponse>('/auth/register', data).then((r) => r.data),
   me: () => api.get('/auth/me').then((r) => r.data),
 };
 
