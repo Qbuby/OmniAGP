@@ -1,6 +1,8 @@
 use axum::{
+    body::Body,
     extract::{Json, Path, State},
-    http::StatusCode,
+    http::{header, HeaderValue, StatusCode},
+    response::{IntoResponse, Response},
     routing::{get, post},
     Router,
 };
@@ -9,8 +11,12 @@ use omni_core::{AssetQuality, GameEngine, GameProject, LlmProviderConfig, Pipeli
 use omni_llm::LlmClient;
 use omni_orchestrator::Pipeline;
 use serde::{Deserialize, Serialize};
+use std::io::{Cursor, Read, Write};
+use std::path::{Path as StdPath, PathBuf};
 use std::sync::Arc;
 use uuid::Uuid;
+use walkdir::WalkDir;
+use zip::write::SimpleFileOptions;
 
 use crate::state::{AppState, PipelineEvent};
 
@@ -61,6 +67,7 @@ pub fn router() -> Router<Arc<AppState>> {
     Router::new()
         .route("/api/v1/projects", get(list_projects).post(create_project))
         .route("/api/v1/projects/{id}", get(get_project).put(update_project).delete(delete_project))
+        .route("/api/v1/projects/{id}/artifact", get(download_artifact))
         .route("/api/v1/projects/{id}/run", post(run_pipeline))
 }
 
@@ -194,7 +201,139 @@ async fn delete_project(
 ) -> Result<StatusCode, StatusCode> {
     let _claims = crate::auth::extract_claims(&state.jwt_secret, &headers)?;
     state.projects.remove(&id).ok_or(StatusCode::NOT_FOUND)?;
+    state.artifact_dirs.remove(&id);
     Ok(StatusCode::NO_CONTENT)
+}
+
+async fn download_artifact(
+    State(state): State<Arc<AppState>>,
+    headers: axum::http::HeaderMap,
+    Path(id): Path<Uuid>,
+) -> Response {
+    if let Err(status) = crate::auth::extract_claims(&state.jwt_secret, &headers) {
+        return status.into_response();
+    }
+
+    let (project_name, status_label) = match state.projects.get(&id) {
+        Some(entry) => {
+            let p = entry.value();
+            (p.name.clone(), format!("{:?}", p.status))
+        }
+        None => return StatusCode::NOT_FOUND.into_response(),
+    };
+
+    if status_label != "Complete" {
+        return (
+            StatusCode::CONFLICT,
+            [(header::CONTENT_TYPE, HeaderValue::from_static("application/json"))],
+            r#"{"error":"pipeline_not_complete"}"#,
+        )
+            .into_response();
+    }
+
+    let artifact_dir = match state.artifact_dirs.get(&id) {
+        Some(entry) => entry.value().clone(),
+        None => return StatusCode::NOT_FOUND.into_response(),
+    };
+
+    if !artifact_dir.exists() {
+        return StatusCode::NOT_FOUND.into_response();
+    }
+
+    let dir_clone = artifact_dir.clone();
+    let zip_result =
+        tokio::task::spawn_blocking(move || zip_directory(&dir_clone)).await;
+
+    let bytes = match zip_result {
+        Ok(Ok(b)) => b,
+        Ok(Err(e)) => {
+            tracing::error!(error = %e, "failed to zip artifact dir");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+        Err(e) => {
+            tracing::error!(error = %e, "zip task panicked");
+            return StatusCode::INTERNAL_SERVER_ERROR.into_response();
+        }
+    };
+
+    let short_id = id.simple().to_string();
+    let short = &short_id[..short_id.len().min(8)];
+    let safe_name = sanitize_filename(&project_name);
+    let filename = format!("{safe_name}-{short}.zip");
+    let disposition = format!("attachment; filename=\"{filename}\"");
+
+    Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_TYPE, "application/zip")
+        .header(header::CONTENT_DISPOSITION, disposition)
+        .header(header::CONTENT_LENGTH, bytes.len().to_string())
+        .body(Body::from(bytes))
+        .unwrap_or_else(|_| StatusCode::INTERNAL_SERVER_ERROR.into_response())
+}
+
+fn sanitize_filename(name: &str) -> String {
+    let trimmed = name.trim();
+    let mut out: String = trimmed
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
+                c
+            } else if c.is_whitespace() {
+                '_'
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    if out.is_empty() {
+        out = "project".into();
+    }
+    if out.len() > 64 {
+        out.truncate(64);
+    }
+    out
+}
+
+fn zip_directory(dir: &StdPath) -> std::io::Result<Vec<u8>> {
+    let mut buffer = Cursor::new(Vec::<u8>::new());
+    {
+        let mut writer = zip::ZipWriter::new(&mut buffer);
+        let options = SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Deflated);
+
+        let mut wrote_any = false;
+        for entry in WalkDir::new(dir).into_iter().filter_map(|e| e.ok()) {
+            let path = entry.path();
+            let rel = match path.strip_prefix(dir) {
+                Ok(r) => r,
+                Err(_) => continue,
+            };
+            if rel.as_os_str().is_empty() {
+                continue;
+            }
+            let rel_str = rel.to_string_lossy().replace('\\', "/");
+
+            if entry.file_type().is_dir() {
+                let dir_entry = format!("{rel_str}/");
+                writer.add_directory(dir_entry, options)?;
+            } else if entry.file_type().is_file() {
+                writer.start_file(rel_str, options)?;
+                let mut f = std::fs::File::open(path)?;
+                let mut buf = Vec::new();
+                f.read_to_end(&mut buf)?;
+                writer.write_all(&buf)?;
+                wrote_any = true;
+            }
+        }
+
+        if !wrote_any {
+            writer.start_file("EMPTY.txt", options)?;
+            writer.write_all(b"No artifacts were produced for this project.\n")?;
+        }
+
+        writer.finish()?;
+    }
+    Ok(buffer.into_inner())
 }
 
 async fn run_pipeline(
@@ -213,10 +352,22 @@ async fn run_pipeline(
 
     let events_tx = state.pipeline_events.clone();
     let projects = state.projects.clone();
+    let artifact_dirs = state.artifact_dirs.clone();
+    let artifact_dir: PathBuf = state.artifact_root.join(id.to_string());
+
+    if let Err(e) = std::fs::create_dir_all(&artifact_dir) {
+        tracing::warn!(
+            error = %e,
+            dir = %artifact_dir.display(),
+            "failed to pre-create project artifact dir"
+        );
+    }
+    artifact_dirs.insert(id, artifact_dir.clone());
 
     tokio::spawn(async move {
         let llm = LlmClient::from_env("LLM_BASE_URL", "LLM_API_KEY").unwrap();
-        let mut pipeline = Pipeline::new(project.clone(), llm);
+        let mut pipeline =
+            Pipeline::with_output_dir(project.clone(), llm, Some(artifact_dir.clone()));
 
         let steps = ["Game Design Analysis", "Code Generation", "Asset Generation", "Scene Assembly"];
         for (i, step_name) in steps.iter().enumerate() {

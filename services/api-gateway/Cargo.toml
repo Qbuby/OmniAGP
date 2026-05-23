@@ -34,6 +34,8 @@ reqwest = { workspace = true }
 async-nats = { workspace = true }
 rusqlite = { workspace = true }
 bcrypt = "0.15"
+zip = { version = "2", default-features = false, features = ["deflate"] }
+walkdir = "2"
 
 [dev-dependencies]
 tower = { version = "0.5", features = ["util"] }
