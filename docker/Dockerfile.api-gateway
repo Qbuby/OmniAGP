@@ -1,8 +1,12 @@
-FROM rust:1.78-slim AS builder
+FROM rust:latest AS builder
 WORKDIR /app
 COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 COPY services/ services/
+COPY orchestrator/ orchestrator/
+COPY examples/ examples/
+COPY tests/ tests/
+COPY web/dist web/dist
 RUN cargo build --release --bin omni-api-gateway
 
 FROM debian:bookworm-slim

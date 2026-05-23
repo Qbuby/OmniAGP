@@ -1,7 +1,7 @@
 services:
   nats:
     image: nats:2.10-alpine
-    command: ["--jetstream", "--store_dir", "/data"]
+    command: ["--jetstream", "--store_dir", "/data", "-m", "8222"]
     ports:
       - "4222:4222"
       - "8222:8222"
@@ -125,7 +125,13 @@ services:
       - LLM_MODEL=${LLM_MODEL:-qwen2.5-coder-7b}
       - AUDIO_PIPELINE_URL=http://audio-pipeline:8090
       - ASSET_DIRECTOR_URL=http://asset-director:8092
+      - AUTH_JWT_SECRET=${AUTH_JWT_SECRET:-omniagp-dev-secret-change-me}
+      - GITHUB_CLIENT_ID=${GITHUB_CLIENT_ID:-}
+      - GITHUB_CLIENT_SECRET=${GITHUB_CLIENT_SECRET:-}
+      - USERS_DB_PATH=/data/users.db
       - RUST_LOG=info
+    volumes:
+      - api_gateway_data:/data
     depends_on:
       - nats
       - qdrant
@@ -211,5 +217,6 @@ volumes:
   pipeline_3d_output:
   audio_output:
   asset_output:
+  api_gateway_data:
   prometheus_data:
   grafana_data:
