@@ -32,3 +32,10 @@ futures = { workspace = true }
 tokio-stream = "0.1"
 reqwest = { workspace = true }
 async-nats = { workspace = true }
+rusqlite = { workspace = true }
+bcrypt = "0.15"
+
+[dev-dependencies]
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+hyper = { version = "1", features = ["full"] }

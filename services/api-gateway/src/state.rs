@@ -1,3 +1,4 @@
+use crate::users::UserStore;
 use dashmap::DashMap;
 use omni_core::GameProject;
 use omni_scheduler::TaskQueue;
@@ -13,6 +14,7 @@ pub struct AppState {
     pub jwt_secret: String,
     pub github_client_id: String,
     pub github_client_secret: String,
+    pub user_store: UserStore,
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
