@@ -24,6 +24,30 @@ export default function ProjectDetailPage() {
     },
   });
 
+  const downloadMutation = useMutation({
+    mutationFn: () => projectsApi.downloadArtifact(id!),
+    onSuccess: (response) => {
+      const disposition = response.headers['content-disposition'] || '';
+      const match = disposition.match(/filename="?([^";\n]+)"?/);
+      const filename = match?.[1] || `${project?.name || 'artifact'}-${id!.slice(0, 8)}.zip`;
+      const url = URL.createObjectURL(response.data);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    },
+    onError: (err: any) => {
+      if (err.response?.status === 409) {
+        alert('管线尚未完成，无法下载');
+      } else {
+        alert(err.response?.data?.message || err.message || '下载失败');
+      }
+    },
+  });
+
   const deleteMutation = useMutation({
     mutationFn: () => projectsApi.delete(id!),
     onSuccess: () => {
@@ -122,8 +146,12 @@ export default function ProjectDetailPage() {
                 {isRunning ? '运行中...' : '启动管线'}
               </button>
               {project.status.includes('Complete') && (
-                <button className="w-full bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors">
-                  下载构建产物
+                <button
+                  onClick={() => downloadMutation.mutate()}
+                  disabled={downloadMutation.isPending}
+                  className="w-full bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+                >
+                  {downloadMutation.isPending ? '下载中...' : '下载构建产物'}
                 </button>
               )}
               <button

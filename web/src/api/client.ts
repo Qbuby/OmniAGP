@@ -56,6 +56,9 @@ export const projectsApi = {
 
   runPipeline: (id: string) =>
     api.post<{ status: string; project_id: string }>(`/projects/${id}/run`).then((r) => r.data),
+
+  downloadArtifact: (id: string) =>
+    api.get<Blob>(`/projects/${id}/artifact`, { responseType: 'blob' }).then((r) => r),
 };
 
 export interface AuthProviders {
