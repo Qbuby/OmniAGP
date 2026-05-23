@@ -1,10 +1,11 @@
 use anyhow::Result;
 use axum::{extract::State, routing::{get, post}, Json, Router};
 use dashmap::DashMap;
-use omni_api_gateway::{auth, projects, static_files, state::AppState, websocket};
+use omni_api_gateway::{auth, projects, static_files, state::AppState, users::UserStore, websocket};
 use omni_core::{TaskCapability, TaskPayload, TaskPriority};
 use omni_scheduler::TaskQueue;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tower_http::cors::{Any, CorsLayer};
@@ -130,9 +131,29 @@ async fn main() -> Result<()> {
 
     let nats_url = std::env::var("NATS_URL").unwrap_or_else(|_| "nats://localhost:4222".into());
     let default_model = std::env::var("LLM_MODEL").unwrap_or_else(|_| "qwen2.5-coder-7b".into());
-    let jwt_secret = std::env::var("JWT_SECRET").unwrap_or_else(|_| "omniagp-dev-secret-change-me".into());
+    let jwt_secret = std::env::var("AUTH_JWT_SECRET")
+        .or_else(|_| std::env::var("JWT_SECRET"))
+        .unwrap_or_else(|_| "omniagp-dev-secret-change-me".into());
     let github_client_id = std::env::var("GITHUB_CLIENT_ID").unwrap_or_default();
     let github_client_secret = std::env::var("GITHUB_CLIENT_SECRET").unwrap_or_default();
+    let users_db_path: PathBuf = std::env::var("USERS_DB_PATH")
+        .unwrap_or_else(|_| "/data/users.db".into())
+        .into();
+
+    let user_store = match UserStore::open(&users_db_path) {
+        Ok(s) => {
+            tracing::info!(path = %users_db_path.display(), "user store ready");
+            s
+        }
+        Err(e) => {
+            tracing::warn!(
+                error = %e,
+                path = %users_db_path.display(),
+                "user store init failed, falling back to in-memory store",
+            );
+            UserStore::in_memory().expect("in-memory user store must initialize")
+        }
+    };
 
     let (events_tx, _) = broadcast::channel(256);
 
@@ -147,6 +168,7 @@ async fn main() -> Result<()> {
         jwt_secret,
         github_client_id,
         github_client_secret,
+        user_store,
     });
 
     let cors = CorsLayer::new()
