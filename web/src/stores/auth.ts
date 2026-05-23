@@ -3,8 +3,9 @@ import { persist } from 'zustand/middleware';
 
 interface User {
   id: string;
-  name: string;
-  avatar_url: string | null;
+  username: string;
+  name?: string;
+  avatar_url?: string | null;
 }
 
 interface AuthState {
